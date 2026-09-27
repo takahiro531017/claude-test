@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>履歴一覧 | 在庫管理システム</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header" id="app-header"></header>
+  <main class="container">
+    <h1>入出庫履歴一覧</h1>
+    <p class="subtitle">品番・拠点・区分・期間で絞り込みできます。</p>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="field" style="margin:0">
+          <label for="fProduct">品番</label>
+          <input id="fProduct" list="product-list" placeholder="すべて" autocomplete="off" style="width:160px" />
+          <datalist id="product-list"></datalist>
+        </div>
+        <div class="field" style="margin:0">
+          <label for="fLocation">拠点</label>
+          <select id="fLocation"><option value="">すべて</option></select>
+        </div>
+        <div class="field" style="margin:0">
+          <label for="fType">区分</label>
+          <select id="fType">
+            <option value="">すべて</option>
+            <option value="inbound">入庫</option>
+            <option value="outbound">出荷</option>
+            <option value="damage">破損</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0">
+          <label for="fFrom">開始日</label>
+          <input id="fFrom" type="date" />
+        </div>
+        <div class="field" style="margin:0">
+          <label for="fTo">終了日</label>
+          <input id="fTo" type="date" />
+        </div>
+        <button id="filterBtn" class="secondary" style="align-self:flex-end">絞り込む</button>
+        <button id="resetBtn" class="secondary" style="align-self:flex-end">リセット</button>
+      </div>
+      <div id="message"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>日時</th><th>品番</th><th>拠点</th><th>区分</th><th class="text-right">数量</th><th>備考</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/history.js"></script>
+</body>
+</html>

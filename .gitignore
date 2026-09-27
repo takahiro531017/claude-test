@@ -1,0 +1,4 @@
+node_modules/
+data/inventory.db
+data/inventory.db-*
+*.log

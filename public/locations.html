@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>拠点マスタ | 在庫管理システム</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header" id="app-header"></header>
+  <main class="container">
+    <h1>拠点マスタ</h1>
+    <p class="subtitle">入出庫の拠点（引取り業者・倉庫など）を管理します。</p>
+
+    <div class="card">
+      <h2>拠点を追加</h2>
+      <div id="message"></div>
+      <form id="form" class="toolbar">
+        <input id="name" placeholder="拠点名（例: TOLL引取り）" required style="min-width:260px" />
+        <button type="submit" class="primary">追加</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>拠点名</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/locations.js"></script>
+</body>
+</html>
