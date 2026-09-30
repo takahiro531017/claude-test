@@ -763,6 +763,25 @@
     existing = (existing||"").trim();
     return existing ? (existing+"→"+entry) : entry;
   }
+
+  var autoInspectDone = false;
+  function autoAdvanceStaleReceived(){
+    if(!db || autoInspectDone) return;
+    autoInspectDone = true;
+    var todayMs = new Date(todayISO()+"T00:00:00").getTime();
+    state.repairs.forEach(function(r){
+      if(r.status !== "received" || !r.receivedDate) return;
+      var recMs = new Date(r.receivedDate+"T00:00:00").getTime();
+      var days = Math.round((todayMs - recMs) / 86400000);
+      if(days >= 2){
+        db.collection("repairs").doc(r.id).update({
+          status: "inspecting",
+          remarks: appendRemark(r.remarks, "inspecting"),
+          updatedAt: new Date().toISOString()
+        }).catch(function(err){ console.error(err); });
+      }
+    });
+  }
   function toast(msg){
     var t = $("#toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 2400);
@@ -784,6 +803,7 @@
       db.collection("repairs").orderBy("receivedDate","desc").limit(500).onSnapshot(function(snap){
         state.repairs = snap.docs.map(function(d){ var o = Object.assign({}, d.data()); o.id = d.id; return o; });
         renderStats(); renderRepairs();
+        autoAdvanceStaleReceived();
       }, function(err){ console.error(err); });
 
       db.collection("quotes").orderBy("createdAt","desc").limit(50).onSnapshot(function(snap){
