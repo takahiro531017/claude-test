@@ -17,7 +17,7 @@ def _int(v: str) -> int:
 
 class CsvCollector:
     """手動CSV取り込み。列: item_id,title,price,condition,shipping_payer,
-    listed_at,url,image_url,status,sold_at[,category,description]"""
+    listed_at,url,image_url,status,sold_at[,category,description,size_class]"""
 
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -41,6 +41,7 @@ class CsvCollector:
                     sold_at=(r.get("sold_at") or "").strip(),
                     category=(r.get("category") or "").strip(),
                     description=(r.get("description") or "").strip(),
+                    size_class=(r.get("size_class") or "").strip(),
                 )
 
     def fetch_active(self) -> Iterable[Item]:

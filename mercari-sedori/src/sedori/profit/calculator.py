@@ -15,8 +15,8 @@ def size_class_for(title: str, cfg: ProfitConfig) -> str:
     return cfg.default_size_class
 
 
-def shipping_cost(title: str, cfg: ProfitConfig) -> int:
-    cls = size_class_for(title, cfg)
+def shipping_cost(title: str, cfg: ProfitConfig, size_class: str = "") -> int:
+    cls = size_class or size_class_for(title, cfg)
     if cls in cfg.shipping_table:
         return int(cfg.shipping_table[cls])
     return int(max(cfg.shipping_table.values()))  # 未定義区分は安全側
@@ -27,7 +27,7 @@ def calc_profit(item: Item, market: MarketStat | None, cfg: ProfitConfig) -> Ver
         return Verdict(ok=False, reason="相場データなし")
     sale = market.median
     fee = math.floor(sale * cfg.fee_rate)
-    ship = shipping_cost(item.title, cfg)
+    ship = shipping_cost(item.title, cfg, item.size_class)
     inbound = ship if item.shipping_payer == "buyer" else 0  # 着払いは仕入れ時に送料を負担
     net = sale - item.price - fee - ship - cfg.packing_cost - inbound
     base = sale if cfg.margin_basis == "sale" else item.price

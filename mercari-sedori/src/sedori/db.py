@@ -7,7 +7,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings(
   item_id TEXT PRIMARY KEY, title TEXT, price INTEGER, condition TEXT,
   shipping_payer TEXT, listed_at TEXT, url TEXT, image_url TEXT, category TEXT,
-  description TEXT, product_key TEXT, fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  description TEXT, size_class TEXT, product_key TEXT, fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
   source TEXT);
 CREATE TABLE IF NOT EXISTS sold_items(
   item_id TEXT PRIMARY KEY, title TEXT, price INTEGER, sold_at TEXT,
@@ -35,4 +35,7 @@ def connect(path: str | Path = ":memory:") -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(listings)")}
+    if "size_class" not in cols:  # 旧スキーマからの移行
+        conn.execute("ALTER TABLE listings ADD COLUMN size_class TEXT")
     return conn

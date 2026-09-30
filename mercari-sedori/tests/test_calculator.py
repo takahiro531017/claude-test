@@ -80,3 +80,11 @@ def test_no_market():
 def test_fee_floor():
     m = MarketStat(median=1999, count=9, reliable=True)
     assert calc_profit(item(100), m, CFG).fee == 199
+
+
+def test_item_size_class_overrides_keyword():
+    it = item(5000, title="Nintendo Switch")
+    it.size_class = "nekopos"
+    cfg = ProfitConfig(shipping_table={"nekopos": 210, "s80": 850}, default_size_class="s80",
+                       size_class_by_keyword={"switch": "s80"})
+    assert calc_profit(it, REL, cfg).shipping == 210

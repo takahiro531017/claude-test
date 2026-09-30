@@ -34,9 +34,24 @@ profit:
     s140: 1450
     s160: 1700
   default_size_class: s100     # 未指定時は安全側(大きめ)
-  size_class_by_keyword:       # タイトルにキーワードを含む場合の区分
+  # タイトルにキーワードを含む場合の区分(上から順に判定)。ジャンル不問の汎用例。
+  # 個別指定したい場合は CSV の size_class 列が最優先。該当なしは default_size_class。
+  size_class_by_keyword:
+    ケーブル: nekopos
+    充電器: nekopos
+    カード: nekopos
+    ステッカー: nekopos
+    バッジ: nekopos
     switch: s80
-    airpods: compact           # AirPods Pro は箱ごとだと厚みがあるため。ネコポスに入る物は nekopos を指定
+    ゲーム機: s80
+    ヘッドホン: s80
+    スピーカー: s80
+    airpods: compact
+    イヤホン: compact
+    腕時計: compact
+    スニーカー: s100
+    炊飯器: s120
+    掃除機: s140           # AirPods Pro は箱ごとだと厚みがあるため。ネコポスに入る物は nekopos を指定
 
 exclude:
   keywords_junk: ["ジャンク", "動作未確認", "動作未チェック", "現状品", "部品取り", "難あり"]

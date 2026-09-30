@@ -41,9 +41,9 @@ def store_items(conn: sqlite3.Connection, items: list[Item], sold: bool, source:
         else:
             conn.execute(
                 "INSERT OR REPLACE INTO listings(item_id,title,price,condition,shipping_payer,listed_at,"
-                "url,image_url,category,description,product_key,source) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "url,image_url,category,description,size_class,product_key,source) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (i.item_id, i.title, i.price, i.condition, i.shipping_payer, i.listed_at, i.url,
-                 i.image_url, i.category, i.description, i.product_key, source),
+                 i.image_url, i.category, i.description, i.size_class, i.product_key, source),
             )
     conn.commit()
 

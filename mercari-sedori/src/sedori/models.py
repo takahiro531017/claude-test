@@ -17,6 +17,7 @@ class Item:
     sold_at: str = ""
     category: str = ""
     description: str = ""
+    size_class: str = ""  # 手動指定の送料区分(空なら config のキーワード/既定値)
     product_key: str = ""
 
 
