@@ -1,0 +1,8 @@
+.env
+config.yaml
+data/*.db
+data/*.db-journal
+logs/*.log*
+__pycache__/
+*.egg-info/
+.pytest_cache/

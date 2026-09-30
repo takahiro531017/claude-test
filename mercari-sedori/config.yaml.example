@@ -1,0 +1,57 @@
+# コピーして config.yaml として使う: cp config.yaml.example config.yaml
+search:
+  keywords: ["Nintendo Switch 本体", "AirPods Pro"]
+  price_min: 500
+  price_max: 10000            # 仕入れ価格の上限(円)
+  conditions: ["新品、未使用", "未使用に近い", "目立った傷や汚れなし"]
+
+rate_limit:                    # Playwright版で使用(ステップ3)
+  min_interval_sec: 8
+  jitter_sec: [2, 6]
+  max_searches_per_hour: 30
+
+market:
+  window_days: 30
+  trim_ratio: 0.10
+  min_samples: 5               # これ未満は「信頼度低」
+
+profit:
+  fee_rate: 0.10
+  packing_cost: 100
+  min_net_profit: 1000
+  min_margin_rate: 0.15
+  margin_basis: sale           # sale=利益/想定売価, cost=利益/仕入れ価格
+  require_reliable_market: true
+  shipping_table:              # サイズ区分ごとの送料(円)
+    compact: 450
+    s60: 750
+    s80: 850
+    s100: 1050
+  default_size_class: s100     # 未指定時は安全側(大きめ)
+  size_class_by_keyword:       # タイトルにキーワードを含む場合の区分
+    switch: s80
+    airpods: compact
+
+exclude:
+  keywords_junk: ["ジャンク", "動作未確認", "動作未チェック", "現状品", "部品取り", "難あり"]
+  keywords_fake: ["コピー", "レプリカ", "偽物", "偽", "互換品", "ノーブランド", "海外版並行"]
+  brands: ["ルイヴィトン", "ヴィトン", "シャネル", "グッチ", "エルメス", "プラダ", "ロレックス", "ルイ・ヴィトン", "louis vuitton", "chanel", "gucci", "hermes", "prada", "rolex"]
+  categories: ["チケット", "食品", "化粧品", "コスメ", "医薬品", "サプリ", "金券", "商品券"]
+  ng_words: []
+
+notify:
+  discord:
+    enabled: true              # Webhook URL は .env の DISCORD_WEBHOOK_URL
+
+schedule:
+  interval_minutes: 45
+  quiet_hours: { start: "00:00", end: "07:00" }   # この間は実行しない
+
+listing:
+  model: claude-sonnet-5-5
+  markdown_strategy:
+    - { after_days: 3, rate: -0.03 }
+    - { after_days: 7, rate: -0.05 }
+
+db_path: data/sedori.db
+log_dir: logs
