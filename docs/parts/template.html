@@ -56,6 +56,10 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 .sb{align-items:center}
 kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
 @media print{header,nav,.seg,.tools,.rec,#toast{display:none}.wrap{border:0;overflow:visible}td{font-size:11px}}
+.pics{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.pics img{max-width:110px;max-height:110px;object-fit:contain;border-radius:4px;background:#fff;cursor:zoom-in}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:20;cursor:zoom-out}
+#lb.on{display:flex}#lb img{max-width:94vw;max-height:94vh;background:#fff;border-radius:6px}
 </style>
 </head>
 <body>
@@ -65,9 +69,10 @@ kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
   <div class="hint">全角/半角・ひらがな/カタカナ・大文字/小文字は区別しません。スペースでAND検索。<kbd>/</kbd>で検索欄へ、<kbd>Esc</kbd>でクリア。品番(青)をクリックでコピー。</div>
 </header>
 <nav id="nav"></nav>
-<main id="main"></main><div id="toast"></div>
+<main id="main"></main><div id="toast"></div><div id="lb"><img alt=""></div>
 <script>
 const DATA=/*DATA*/null;
+const IMGS=/*IMGS*/[];
 const $=s=>document.querySelector(s);
 const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/\s+/g,"");
 const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]);
@@ -107,7 +112,7 @@ function renderNav(){
 function sheetHTML(sh){
   const body=sh.rows.map(r=>{
     if(!r.c)return"";
-    const tds=r.c.map(([v,rs,cs])=>`<td${/^[\d,.]+$/.test(v)?` class=num`:""}${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}</td>`).join("");
+    const tds=r.c.map(([v,rs,cs,_c,im])=>`<td${/^[\d,.]+$/.test(v)?` class=num`:""}${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}${im?`<div class="pics">${im.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}</div>`:""}</td>`).join("");
     return`<tr id="r${sh.i}_${r.r}" class="${rowHit(r)?'hit':''}">${tds}</tr>`}).join("");
   return`<h2>${esc(sh.name)}</h2><div class="wrap"><table>${body}</table></div>`;
 }
@@ -147,7 +152,9 @@ addEventListener("keydown",e=>{
   else if(e.key==="Escape"){setQ("");render();$("#q").blur()}
 });
 $("#nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;mode="sheet";render();scrollTo(0,0)};
+$("#lb").onclick=()=>$("#lb").classList.remove("on");
 $("#main").onclick=e=>{
+  const im=e.target.closest(".pics img");if(im){$("#lb img").src=im.src;$("#lb").classList.add("on");return}
   const cd=e.target.closest(".code");
   if(cd){const c=cd.dataset.c;(navigator.clipboard?navigator.clipboard.writeText(c):Promise.reject()).then(()=>toast("コピーしました："+c),()=>toast(c));e.stopPropagation();return}
   const rq=e.target.closest("[data-rq]");if(rq){setQ(rq.dataset.rq);render();return}
