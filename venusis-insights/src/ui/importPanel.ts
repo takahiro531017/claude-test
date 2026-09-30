@@ -3,7 +3,7 @@ import { parseCsv, toCsv } from '../data/csv';
 import { decodeBytes } from '../data/decode';
 import { mapColumns, MissingColumnsError, normalizeTable, buildPost, type ColumnOverrides } from '../data/normalize';
 import { POST_TYPE_LABEL, ImportError, type ImportResult, type Post, type PostType } from '../data/types';
-import { $, esc } from './dom';
+import { $, confirmDialog, esc } from './dom';
 
 export interface ImportHooks {
   getPosts(): Post[];
@@ -175,11 +175,11 @@ export function mountImportPanel(root: HTMLElement, hooks: ImportHooks) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
-  $('#to-sample', root).addEventListener('click', () => {
-    if (confirm('サンプルデータに戻します。読み込み済みのデータは、この端末から削除されます。よろしいですか？')) hooks.onSample();
+  $('#to-sample', root).addEventListener('click', async () => {
+    if (await confirmDialog('サンプルデータに戻します。読み込み済みのデータは、この端末から削除されます。よろしいですか？', 'サンプルに戻す')) hooks.onSample();
   });
-  $('#clear', root).addEventListener('click', () => {
-    if (confirm('読み込み済みのデータをすべて削除します。元に戻せません。よろしいですか？')) {
+  $('#clear', root).addEventListener('click', async () => {
+    if (await confirmDialog('読み込み済みのデータをすべて削除します。元に戻せません。よろしいですか？', '削除する')) {
       hooks.onClear();
       setStatus('削除しました。');
     }
