@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """オークローン部品表(xlsx) -> index.html (データ埋め込み)。 usage: build.py parts.xlsx"""
 import sys, json, unicodedata, openpyxl
+
+def nf(s):  # NFKC（①等の丸数字は部品図の番号なので維持）
+    return "".join(c if "\u2460" <= c <= "\u2473" else unicodedata.normalize("NFKC", c) for c in s)
+
 from openpyxl.utils import get_column_letter
 wb = openpyxl.load_workbook(sys.argv[1])
 sheets = []
@@ -17,7 +21,7 @@ for ws in wb:
         if v is None: return ""
         if isinstance(v, float) and v.is_integer(): v = int(v)
         if isinstance(v, int) and abs(v) >= 1000 and len(str(v)) < 9: return f"{v:,}"
-        return str(v).replace("　", " ").strip()
+        return nf(str(v)).strip()
     # 有効範囲
     maxr = maxc = 0
     for r in range(1, ws.max_row + 1):
@@ -44,7 +48,7 @@ for ws in wb:
             if spanned: row["c"] = []; keep.append(row)
             continue
         keep.append(row)
-    sheets.append({"name": ws.title.strip(), "rows": [{"r": k["r"], "c": k["c"]} for k in keep]})
+    sheets.append({"name": nf(ws.title).strip(), "rows": [{"r": k["r"], "c": k["c"]} for k in keep]})
 tpl = open(__file__.replace("build.py", "template.html"), encoding="utf-8").read()
 out = tpl.replace("/*DATA*/null", json.dumps(sheets, ensure_ascii=False, separators=(",", ":")))
 open(__file__.replace("build.py", "index.html"), "w", encoding="utf-8").write(out)

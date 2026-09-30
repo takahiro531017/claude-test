@@ -24,7 +24,8 @@ main{padding:14px 16px 60px;max-width:1200px;margin:0 auto}
 h2{font-size:16px;margin:0 0 8px}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;min-width:560px}
-td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;white-space:pre-wrap;word-break:break-word;font-size:13.5px}
+td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;white-space:pre-wrap;word-break:break-word;font-size:.9em}
+td.num{white-space:nowrap}
 tr.first td{background:var(--accbg);font-weight:600}
 tr.hit td{background:color-mix(in srgb,var(--mark) 25%,transparent)}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
@@ -33,29 +34,45 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 .card:hover{border-color:var(--acc)}
 .card .s{font-size:12px;color:var(--acc);font-weight:600}
 .card .cells{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px}
-.card .cells span{white-space:pre-wrap;font-size:13.5px}
+.card .cells span{white-space:pre-wrap;font-size:.92em}
 .empty{color:var(--mute);padding:30px 0;text-align:center}
 .cnt{color:var(--mute);font-size:13px;margin:0 0 10px}
 .seg{display:inline-flex;gap:0;margin-bottom:10px}
 .seg button{border-radius:0}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0}
 .seg .on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em;background:var(--accbg);color:var(--acc);border-radius:4px;padding:0 4px;cursor:copy;white-space:nowrap}
+.code:hover{outline:1px solid var(--acc)}
+.bd{display:inline-block;font-size:11.5px;font-weight:700;border-radius:4px;padding:0 5px;margin:0 1px;background:#fde8e6;color:var(--warn);white-space:nowrap}
+.bd.ok{background:#fff1d6;color:#8a5a00}
+@media (prefers-color-scheme:dark){.bd{background:#4a2420}.bd.ok{background:#4a3a14;color:#ffd27a}}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;font-size:13px}
+.tools label{cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+.gh{font-size:13px;font-weight:700;color:var(--mute);margin:14px 0 6px}
+.rec{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;align-items:center;font-size:13px;color:var(--mute)}
+.rec button{padding:2px 10px;border-radius:99px;font-size:13px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:9}
+#toast.on{opacity:.95}
+.fs{display:flex;gap:4px}.fs button{padding:2px 8px}
+.sb{align-items:center}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
+@media print{header,nav,.seg,.tools,.rec,#toast{display:none}.wrap{border:0;overflow:visible}td{font-size:11px}}
 </style>
 </head>
 <body>
 <header id="hd">
   <h1>オークローン部品表</h1>
-  <div class="sb"><input id="q" type="search" placeholder="型番・部品名・品番などで検索（スペースでAND）" autocomplete="off"><button id="clr">クリア</button></div>
-  <div class="hint">全角/半角・ひらがな/カタカナ・大文字/小文字の違いは区別しません（例：「ﾌﾗｲﾊﾟﾝ」「フライパン」「PX000104」）</div>
+  <div class="sb"><input id="q" type="search" placeholder="型番・部品名・品番などで検索（スペースでAND）" autocomplete="off"><button id="clr">クリア</button><span class="fs"><button id="fm" title="文字を小さく">A−</button><button id="fp" title="文字を大きく">A＋</button></span></div>
+  <div class="hint">全角/半角・ひらがな/カタカナ・大文字/小文字は区別しません。スペースでAND検索。<kbd>/</kbd>で検索欄へ、<kbd>Esc</kbd>でクリア。品番(青)をクリックでコピー。</div>
 </header>
 <nav id="nav"></nav>
-<main id="main"></main>
+<main id="main"></main><div id="toast"></div>
 <script>
 const DATA=/*DATA*/null;
 const $=s=>document.querySelector(s);
 const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/\s+/g,"");
 const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]);
-// 元文字列 s 中で、語 terms にマッチする範囲をハイライト (正規化で長さが変わる場合に備え1文字ずつ対応付け)
-function hl(s,terms){
+
+function hl0(s,terms){
   if(!terms.length||!s)return esc(s);
   const map=[];let n="";
   for(let i=0;i<s.length;i++){const t=norm(s[i]);for(const ch of t){n+=ch;map.push(i)}}
@@ -65,50 +82,88 @@ function hl(s,terms){
   for(let i=0;i<s.length;i++){if(on[i]&&!open){o+="<mark>";open=true}if(!on[i]&&open){o+="</mark>";open=false}o+=esc(s[i])}
   return o+(open?"</mark>":"");
 }
-DATA.forEach((sh,i)=>{sh.i=i;sh.rows.forEach(r=>{r.t=norm((r.c||[]).map(c=>c[0]).join(" "))})});
-let cur=0,mode="list",terms=[];
-const rowHit=r=>terms.length&&terms.every(t=>r.t.includes(t));
+// 品番(クリックでコピー)と 終売/廃盤 等のバッジを付けて表示
+const RE=/((?<![A-Za-z0-9])(?=[A-Z0-9-]*(?:\d|KD))[A-Z][A-Z0-9-]{4,}(?![A-Za-z0-9])|MGT-[A-Z]+)|(メーカー終売|メーカー廃盤|終売|廃盤|完売|供給終了|生産終了|取り寄せ不可|取寄不可|取り寄せ出来ず|修理対応)/g;
+const BAD=/終売|廃盤|完売|供給終了|生産終了/;
+function hl(s,terms){
+  if(!s)return"";let o="",p=0,m;RE.lastIndex=0;
+  while((m=RE.exec(s))){
+    o+=hl0(s.slice(p,m.index),terms);
+    o+=m[1]?`<span class="code" data-c="${m[1]}" title="クリックでコピー">${hl0(m[1],terms)}</span>`
+           :`<span class="bd${BAD.test(m[2])?'':' ok'}">${hl0(m[2],terms)}</span>`;
+    p=m.index+m[0].length;
+  }
+  return o+hl0(s.slice(p),terms);
+}
+DATA.forEach((sh,i)=>{sh.i=i;sh.rows.forEach(r=>{const tx=(r.c||[]).map(c=>c[0]).join(" ");r.t=norm(tx);r.dead=BAD.test(tx)})});
+let cur=0,mode="list",terms=[],hideDead=false;
+const LS={get(k,d){try{return localStorage.getItem(k)??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const rowHit=r=>terms.length&&terms.every(t=>r.t.includes(t))&&!(hideDead&&r.dead);
 function hits(sh){return terms.length?sh.rows.filter(rowHit):[]}
 function renderNav(){
   $("#nav").innerHTML=DATA.map(sh=>{const h=hits(sh).length;
     return `<button data-i="${sh.i}" class="${sh.i===cur&&!(terms.length&&mode==='list')?'on':''}">${esc(sh.name)}${h?`<span class="n">${h}</span>`:''}</button>`}).join("");
 }
 function sheetHTML(sh){
-  const body=sh.rows.map((r,ri)=>{
+  const body=sh.rows.map(r=>{
     if(!r.c)return"";
-    const tds=r.c.map(([v,rs,cs])=>`<td${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}</td>`).join("");
+    const tds=r.c.map(([v,rs,cs])=>`<td${/^[\d,.]+$/.test(v)?` class=num`:""}${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}</td>`).join("");
     return`<tr id="r${sh.i}_${r.r}" class="${rowHit(r)?'hit':''}">${tds}</tr>`}).join("");
   return`<h2>${esc(sh.name)}</h2><div class="wrap"><table>${body}</table></div>`;
 }
 function listHTML(){
   let total=0;const out=[];
-  DATA.forEach(sh=>hits(sh).forEach(r=>{total++;
-    out.push(`<div class="card" data-i="${sh.i}" data-r="${r.r}"><div class="s">${esc(sh.name)}</div><div class="cells">${r.c.filter(c=>c[0]).map(c=>`<span>${hl(c[0],terms)}</span>`).join("")}</div></div>`)}));
+  DATA.forEach(sh=>{const h=hits(sh);if(!h.length)return;total+=h.length;
+    out.push(`<div class="gh">${esc(sh.name)}（${h.length}件）</div>`);
+    h.forEach(r=>out.push(`<div class="card" data-i="${sh.i}" data-r="${r.r}"><div class="cells">${r.c.filter(c=>c[0]).map(c=>`<span>${hl(c[0],terms)}</span>`).join("")}</div></div>`))});
   return{total,html:out.join("")}
 }
+function recent(){try{return JSON.parse(LS.get("recent","[]"))}catch(e){return[]}}
+function pushRecent(q){if(!q)return;const r=[q,...recent().filter(x=>x!==q)].slice(0,8);LS.set("recent",JSON.stringify(r))}
 function render(scrollTo){
   const m=$("#main");
   if(terms.length){
     const seg=`<div class="seg"><button data-m="list" class="${mode==='list'?'on':''}">検索結果一覧</button><button data-m="sheet" class="${mode==='sheet'?'on':''}">シート表示（${esc(DATA[cur].name)}）</button></div>`;
+    const tools=`<div class="tools"><label><input type="checkbox" id="hd2" ${hideDead?'checked':''}> 終売・廃盤・完売の行を隠す</label></div>`;
     if(mode==="list"){const l=listHTML();
-      m.innerHTML=seg+`<p class="cnt">${l.total}件ヒット（全シート）。クリックで元の表の位置に移動</p>`+(l.total?`<div class="res">${l.html}</div>`:'<div class="empty">見つかりませんでした</div>');
-    }else m.innerHTML=seg+sheetHTML(DATA[cur]);
-  }else m.innerHTML=sheetHTML(DATA[cur]);
-  renderNav();
+      m.innerHTML=seg+tools+`<p class="cnt">${l.total}件ヒット。行をクリックで元の表の位置へ移動</p>`+(l.total?`<div class="res">${l.html}</div>`:'<div class="empty">見つかりませんでした。別の表記（型番の一部・ひらがな等）でもお試しください</div>');
+    }else m.innerHTML=seg+tools+sheetHTML(DATA[cur]);
+  }else{
+    const rc=recent();
+    m.innerHTML=(rc.length?`<div class="rec">最近の検索：${rc.map(x=>`<button data-rq="${esc(x)}">${esc(x)}</button>`).join("")}</div>`:"")+sheetHTML(DATA[cur]);
+  }
+  renderNav();saveHash();
   if(scrollTo){const e=document.getElementById(scrollTo);if(e)e.scrollIntoView({block:"center"})}
 }
-$("#q").addEventListener("input",e=>{
-  terms=e.target.value.split(/[\s　]+/).map(norm).filter(Boolean);
-  mode="list";render();
+function saveHash(){const h=(terms.length?"q="+encodeURIComponent($("#q").value):"")+"&s="+cur+(terms.length&&mode==="sheet"?"&m=sheet":"");try{history.replaceState(null,"","#"+h)}catch(e){}}
+function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("on"),1400)}
+function setQ(v){$("#q").value=v;terms=v.split(/[\s　]+/).map(norm).filter(Boolean);mode="list"}
+let rt;
+$("#q").addEventListener("input",e=>{setQ(e.target.value);render();clearTimeout(rt);rt=setTimeout(()=>pushRecent(e.target.value.trim()),1200)});
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"){pushRecent(e.target.value.trim());e.target.blur()}});
+$("#clr").onclick=()=>{setQ("");render();$("#q").focus()};
+addEventListener("keydown",e=>{
+  if(e.key==="/"&&document.activeElement!==$("#q")){e.preventDefault();$("#q").focus();$("#q").select()}
+  else if(e.key==="Escape"){setQ("");render();$("#q").blur()}
 });
-$("#clr").onclick=()=>{$("#q").value="";terms=[];render();$("#q").focus()};
 $("#nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;mode="sheet";render();scrollTo(0,0)};
 $("#main").onclick=e=>{
+  const cd=e.target.closest(".code");
+  if(cd){const c=cd.dataset.c;(navigator.clipboard?navigator.clipboard.writeText(c):Promise.reject()).then(()=>toast("コピーしました："+c),()=>toast(c));e.stopPropagation();return}
+  const rq=e.target.closest("[data-rq]");if(rq){setQ(rq.dataset.rq);render();return}
   const b=e.target.closest("[data-m]");if(b){mode=b.dataset.m;render();return}
   const c=e.target.closest(".card");if(c){cur=+c.dataset.i;mode="sheet";render(`r${cur}_${c.dataset.r}`)}
 };
+$("#main").addEventListener("change",e=>{if(e.target.id==="hd2"){hideDead=e.target.checked;render()}});
+let fs=+LS.get("fs",15);
+function applyFs(){fs=Math.min(22,Math.max(12,fs));document.body.style.fontSize=fs+"px";LS.set("fs",fs)}
+$("#fm").onclick=()=>{fs--;applyFs()};$("#fp").onclick=()=>{fs++;applyFs()};applyFs();
 const fit=()=>document.documentElement.style.setProperty("--hh",$("#hd").offsetHeight+"px");
-addEventListener("resize",fit);fit();render();
+addEventListener("resize",fit);fit();
+(function(){const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get("s")&&DATA[+h.get("s")])cur=+h.get("s");
+  if(h.get("q")){setQ(h.get("q"));if(h.get("m")==="sheet")mode="sheet"}})();
+render();
 </script>
 </body>
 </html>
