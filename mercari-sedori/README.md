@@ -63,6 +63,8 @@ python -m sedori listing 1 --condition "目立った傷なし。箱なし。動�
 - `schedule.quiet_hours`: 夜間停止
 - 利益率の分母は `profit.margin_basis`(`sale`=想定売価 / `cost`=仕入れ価格)
 
+**送料テーブル**は、セブン-イレブン発送(らくらくメルカリ便=ヤマト運輸)の料金を初期値にしています(ネコポス/宅急便コンパクト/60〜160サイズ)。料金改定に備え、必ず最新料金で `shipping_table` を更新してください。
+
 **送料のサイズ区分**は商品情報から判別できないため、`size_class_by_keyword` でキーワード別に指定します。未指定は `default_size_class`(安全側)です。
 
 ## ⚠ 利用上の注意

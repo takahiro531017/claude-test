@@ -22,15 +22,21 @@ profit:
   min_margin_rate: 0.15
   margin_basis: sale           # sale=利益/想定売価, cost=利益/仕入れ価格
   require_reliable_market: true
-  shipping_table:              # サイズ区分ごとの送料(円)
-    compact: 450
+  # 送料(円): セブン-イレブン発送 = らくらくメルカリ便(ヤマト運輸)の料金。
+  # 料金改定があり得るため、出品時の最新料金をメルカリのヘルプで確認して更新すること。
+  shipping_table:
+    nekopos: 210               # ネコポス(A4・厚さ3cm以内・1kg以内)
+    compact: 450               # 宅急便コンパクト(専用箱)
     s60: 750
     s80: 850
     s100: 1050
+    s120: 1200
+    s140: 1450
+    s160: 1700
   default_size_class: s100     # 未指定時は安全側(大きめ)
   size_class_by_keyword:       # タイトルにキーワードを含む場合の区分
     switch: s80
-    airpods: compact
+    airpods: compact           # AirPods Pro は箱ごとだと厚みがあるため。ネコポスに入る物は nekopos を指定
 
 exclude:
   keywords_junk: ["ジャンク", "動作未確認", "動作未チェック", "現状品", "部品取り", "難あり"]
