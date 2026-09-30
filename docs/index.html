@@ -1,0 +1,1688 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>修理台帳</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --paper:#eef1f2;
+    --surface:#ffffff;
+    --surface-2:#e2e7e9;
+    --ink:#1b2426;
+    --ink-soft:#5f6b6e;
+    --line:#d3dadc;
+    --accent:#1f6f78;
+    --accent-strong:#14545c;
+    --accent-ink:#ffffff;
+    --st-received:#3f5fa8;      --st-received-bg:#e6ebf7;
+    --st-progress:#a8650f;      --st-progress-bg:#f7ecd8;
+    --st-done:#2f8a5c;          --st-done-bg:#e2f2e9;
+    --st-delivered:#666e73;     --st-delivered-bg:#e9ebec;
+    --danger:#b83c33;
+    --danger-bg:#f6e2e0;
+    --shadow: 0 8px 24px -12px rgba(20,30,32,.28);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#11181a; --surface:#1a2326; --surface-2:#212c2f;
+      --ink:#e9eef0; --ink-soft:#9fb1b5; --line:#2d3a3e;
+      --accent:#57b8c2; --accent-strong:#7ccdd6; --accent-ink:#0c1516;
+      --st-received:#8fa9e8; --st-received-bg:#232d47;
+      --st-progress:#e5aa53; --st-progress-bg:#3c2f18;
+      --st-done:#63c793; --st-done-bg:#1c3427;
+      --st-delivered:#a7afb4; --st-delivered-bg:#282f32;
+      --danger:#e37a70; --danger-bg:#3a2320;
+      --shadow: 0 8px 28px -12px rgba(0,0,0,.55);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+      --paper:#11181a; --surface:#1a2326; --surface-2:#212c2f;
+      --ink:#e9eef0; --ink-soft:#9fb1b5; --line:#2d3a3e;
+      --accent:#57b8c2; --accent-strong:#7ccdd6; --accent-ink:#0c1516;
+      --st-received:#8fa9e8; --st-received-bg:#232d47;
+      --st-progress:#e5aa53; --st-progress-bg:#3c2f18;
+      --st-done:#63c793; --st-done-bg:#1c3427;
+      --st-delivered:#a7afb4; --st-delivered-bg:#282f32;
+      --danger:#e37a70; --danger-bg:#3a2320;
+      --shadow: 0 8px 28px -12px rgba(0,0,0,.55);
+      color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
+    padding-inline:16px; padding-block: 0 40px;
+  }
+  h1,h2,h3{ font-family:'Zen Kaku Gothic New','Noto Sans JP',sans-serif; text-wrap:balance; margin:0; }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  button{ font-family:inherit; }
+  input,select,textarea{ font-family:inherit; font-size:14px; }
+
+  /* ---------- header ---------- */
+  header.app-bar{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:40;
+    margin-inline:-16px; padding:10px 16px; padding-top: calc(10px + env(safe-area-inset-top,0px));
+    background:var(--surface); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:baseline; gap:8px; margin-right:auto; }
+  .brand .mark{ width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex:none; }
+  .brand h1{ font-size:19px; font-weight:900; letter-spacing:.02em; }
+  .brand small{ color:var(--ink-soft); font-size:11px; display:block; margin-top:-2px; }
+  nav.tabs{ display:flex; gap:2px; background:var(--surface-2); padding:3px; border-radius:10px; }
+  nav.tabs button{
+    border:none; background:transparent; color:var(--ink-soft); padding:8px 14px; border-radius:8px;
+    font-weight:700; font-size:13px; cursor:pointer; transition:background .15s,color .15s;
+  }
+  nav.tabs button.active{ background:var(--surface); color:var(--accent); box-shadow:var(--shadow); }
+  .roflag{ font-size:11px; color:var(--ink-soft); background:var(--surface-2); padding:4px 9px; border-radius:99px; white-space:nowrap; }
+
+  main{ max-width:1180px; margin:0 auto; padding-top:20px; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* ---------- buttons ---------- */
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; border-radius:9px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink); padding:9px 14px; font-size:13px; font-weight:700;
+    cursor:pointer; transition:border-color .15s, transform .05s;
+  }
+  .btn:hover{ border-color:var(--accent); }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .btn-primary:hover{ background:var(--accent-strong); border-color:var(--accent-strong); }
+  .btn-ghost{ border-color:transparent; background:transparent; }
+  .btn-danger{ color:var(--danger); }
+  .btn-sm{ padding:6px 10px; font-size:12px; border-radius:7px; }
+  .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+
+  /* ---------- dashboard summary ---------- */
+  .stat-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px; margin-bottom:18px; }
+  .stat{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .stat b{ display:block; font-size:24px; font-family:'Zen Kaku Gothic New'; }
+  .stat span{ font-size:12px; color:var(--ink-soft); font-weight:700; }
+  .stat.st-received b{ color:var(--st-received); }
+  .stat.st-progress b{ color:var(--st-progress); }
+  .stat.st-done b{ color:var(--st-done); }
+  .stat.st-delivered b{ color:var(--st-delivered); }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .toolbar input[type=search]{
+    flex:1 1 220px; min-width:160px; padding:9px 12px; border:1px solid var(--line); border-radius:9px;
+    background:var(--surface); color:var(--ink);
+  }
+  .chip-group{ display:flex; gap:6px; flex-wrap:wrap; }
+  .chip{
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); border-radius:99px;
+    padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .chip.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+
+  /* ---------- table / card list ---------- */
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .table-scroll{ overflow-x:auto; }
+  table.repair-table{ width:100%; border-collapse:collapse; }
+  table.repair-table th{
+    text-align:left; font-size:11px; color:var(--ink-soft); font-weight:700; padding:10px 12px;
+    background:var(--surface-2); border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.repair-table td{ padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; white-space:nowrap; }
+  table.repair-table tr:last-child td{ border-bottom:none; }
+  table.repair-table tr:hover td{ background:var(--surface-2); }
+  #repairTable tbody tr{ cursor:pointer; }
+  .cell-sub{ display:block; color:var(--ink-soft); font-size:11.5px; margin-top:2px; }
+  .truncate{ max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .pill{ display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:99px; font-size:12px; font-weight:700; }
+  .pill.st-received{ background:var(--st-received-bg); color:var(--st-received); }
+  .pill.st-progress{ background:var(--st-progress-bg); color:var(--st-progress); }
+  .pill.st-done{ background:var(--st-done-bg); color:var(--st-done); }
+  .pill.st-delivered{ background:var(--st-delivered-bg); color:var(--st-delivered); }
+  .pill.charge-paid{ background:var(--surface-2); color:var(--ink-soft); }
+  .pill.charge-free{ background:var(--st-done-bg); color:var(--st-done); }
+
+  select.status-select{ border:1px solid var(--line); border-radius:8px; padding:5px 7px; background:var(--surface); color:var(--ink); font-size:12px; font-weight:700; }
+  .row-actions{ display:flex; gap:6px; justify-content:flex-end; }
+  .empty-state{ padding:56px 20px; text-align:center; color:var(--ink-soft); }
+  .empty-state b{ display:block; color:var(--ink); font-size:16px; margin-bottom:6px; }
+
+  @media (max-width:760px){
+    .stat-row{ grid-template-columns:repeat(2,1fr); }
+    table.repair-table thead{ display:none; }
+    table.repair-table, table.repair-table tbody, table.repair-table tr, table.repair-table td{ display:block; width:100%; }
+    table.repair-table tr{ padding:12px 14px; border-bottom:1px solid var(--line); }
+    table.repair-table td{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:5px 0; border:none; text-align:right; white-space:normal; }
+    table.repair-table td::before{ content:attr(data-label); color:var(--ink-soft); font-weight:700; text-align:left; flex:none; }
+    table.repair-table td.truncate{ max-width:100%; }
+    .row-actions{ justify-content:flex-end; width:100%; }
+  }
+
+  /* ---------- modal / slide-over ---------- */
+  .overlay{ position:fixed; inset:0; background:rgba(10,15,16,.45); z-index:100; display:flex; justify-content:flex-end; }
+  .overlay[hidden]{ display:none; }
+  .sheet{
+    width:min(480px,100%); height:100%; background:var(--surface); box-shadow:var(--shadow);
+    display:flex; flex-direction:column; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .sheet-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line); }
+  .sheet-body{ padding:16px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px; }
+  .sheet-foot{ padding:14px 18px; border-top:1px solid var(--line); display:flex; gap:10px; justify-content:flex-end; }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:12px; font-weight:700; color:var(--ink-soft); }
+  .field input, .field select, .field textarea{
+    padding:9px 11px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); width:100%;
+  }
+  .field textarea{ resize:vertical; min-height:60px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .field input:disabled, .field select:disabled, .field textarea:disabled{ background:var(--surface-2); color:var(--ink-soft); cursor:not-allowed; }
+  .store-picker.locked{ opacity:.65; }
+  .store-picker.locked .spt{ cursor:not-allowed; }
+
+  /* ---------- store picker ---------- */
+  .store-picker{ position:relative; }
+  .store-picker-tabs{ display:flex; gap:6px; margin-bottom:6px; }
+  .spt{ border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); border-radius:7px;
+    padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer; }
+  .spt.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .store-mode-browse{ display:flex; gap:8px; }
+  .store-mode-browse select{ flex:1; min-width:0; }
+  .store-list{
+    position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; z-index:20;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow);
+  }
+  .store-list[hidden]{ display:none; }
+  .store-opt{ padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); }
+  .store-opt:last-child{ border-bottom:none; }
+  .store-opt:hover{ background:var(--surface-2); }
+  .store-opt-name{ display:block; font-size:13px; font-weight:700; }
+  .store-opt-addr{ display:block; font-size:11.5px; color:var(--ink-soft); margin-top:1px; }
+  .store-preview{ margin-top:6px; padding:9px 11px; background:var(--surface-2); border-radius:8px; font-size:12px; color:var(--ink-soft); line-height:1.6; }
+  .store-preview[hidden]{ display:none; }
+  .store-preview b{ color:var(--ink); }
+
+  /* ---------- toast ---------- */
+  #toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:99px; font-size:13px; font-weight:700;
+    z-index:200; pointer-events:none; transition:opacity .2s, transform .2s; box-shadow:var(--shadow); }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- confirm dialog ---------- */
+  .confirm-box{ position:fixed; inset:0; background:rgba(10,15,16,.45); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .confirm-box[hidden]{ display:none; }
+  .confirm-card{ background:var(--surface); border-radius:14px; padding:20px; max-width:340px; width:100%; box-shadow:var(--shadow); }
+  .confirm-card p{ margin:0 0 16px; font-size:14px; line-height:1.6; }
+  .confirm-card .row{ display:flex; gap:8px; justify-content:flex-end; }
+
+  /* ---------- quote tab ---------- */
+  .quote-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:900px){ .quote-grid{ grid-template-columns:1fr; } }
+  .quote-form{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:14px; }
+  .quote-form h3{ font-size:14px; }
+  .items-table{ width:100%; border-collapse:collapse; }
+  .items-table th{ text-align:left; font-size:11px; color:var(--ink-soft); padding:6px 6px; border-bottom:1px solid var(--line); }
+  .items-table td{ padding:6px 6px; vertical-align:middle; }
+  .items-table input{ width:100%; padding:7px 8px; border:1px solid var(--line); border-radius:7px; background:var(--paper); color:var(--ink); }
+  .items-table td.num{ text-align:right; }
+  .items-table .amt{ font-size:13px; white-space:nowrap; }
+  .items-table .col-name{ width:auto; }
+  .items-table .col-qty, .items-table .col-price{ width:78px; }
+  .items-table .col-amt{ width:96px; }
+  .items-table .col-del{ width:30px; }
+  .totals{ display:flex; flex-direction:column; gap:6px; align-items:flex-end; padding-top:8px; border-top:1px dashed var(--line); }
+  .totals .line{ display:flex; gap:18px; font-size:13px; color:var(--ink-soft); }
+  .totals .line b{ color:var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; min-width:110px; text-align:right; font-variant-numeric:tabular-nums; }
+  .totals .grand{ font-size:19px; }
+  .totals .grand b{ color:var(--accent); font-size:20px; }
+  .form-actions{ display:flex; gap:8px; flex-wrap:wrap; padding-top:4px; }
+
+  /* ---------- printable document ---------- */
+  #quotePreview{
+    background:#ffffff; color:#1c1c1c; border-radius:14px; padding:32px; box-shadow:var(--shadow);
+    font-family:'Noto Sans JP',sans-serif; border:1px solid #d8d8d8;
+    width:100%; margin:0; box-sizing:border-box;
+  }
+  .doc-head{ display:flex; flex-direction:column; gap:12px; margin-bottom:22px; }
+  .doc-title{ text-align:center; font-family:'Zen Kaku Gothic New'; font-size:24px; font-weight:900; letter-spacing:.14em; }
+  .doc-meta{ text-align:right; font-size:11.5px; color:#555; line-height:1.9; }
+  .doc-meta #pvNo{ font-size:15px; font-weight:700; color:#1c1c1c; }
+  .doc-parties{ display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:20px; }
+  .doc-to{ font-size:15px; font-weight:700; border-bottom:2px solid #1c1c1c; padding-bottom:8px; min-width:200px; }
+  .doc-to span{ display:block; font-size:10.5px; font-weight:400; color:#777; margin-bottom:3px; }
+  .doc-to #pvCustomer{ font-size:22px; font-weight:700; color:#1c1c1c; }
+  .doc-from{ text-align:right; font-size:12px; line-height:1.7; color:#333; margin-top:12px; }
+  .doc-from b{ font-size:18px; font-weight:700; display:block; margin-bottom:4px; }
+  .doc-greeting{ font-size:12.5px; line-height:1.9; color:#333; margin-bottom:20px; }
+  .doc-info{ border:1px solid #ddd; border-radius:8px; padding:10px 14px; margin-bottom:16px; display:flex; flex-direction:column; gap:6px; background:#fafaf8; }
+  .doc-info-row{ display:flex; gap:10px; font-size:12px; }
+  .doc-info-row span{ flex:0 0 74px; color:#666; font-weight:700; }
+  .doc-info-row b{ font-weight:500; color:#222; flex:1; white-space:pre-wrap; }
+  .doc-amount-box{ display:flex; align-items:center; gap:10px; background:#f2f2f0; border:1px solid #ddd; border-radius:8px; padding:12px 16px; margin-bottom:20px; }
+  .doc-amount-box span{ font-size:12px; color:#555; font-weight:700; }
+  .doc-amount-box b{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:22px; margin-left:auto; }
+  table.doc-items{ width:100%; border-collapse:collapse; margin-bottom:14px; }
+  table.doc-items th{ font-size:11px; text-align:left; padding:8px 6px; border-bottom:2px solid #1c1c1c; color:#333; }
+  table.doc-items td{ font-size:12.5px; padding:8px 6px; border-bottom:1px solid #ddd; }
+  table.doc-items td.num, table.doc-items th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .doc-totals{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; margin-bottom:22px; }
+  .doc-totals .l{ display:flex; gap:30px; font-size:12.5px; }
+  .doc-totals .l span{ min-width:100px; text-align:right; font-variant-numeric:tabular-nums; }
+  .doc-totals .l.grand{ font-size:15px; font-weight:700; border-top:1px solid #1c1c1c; padding-top:6px; margin-top:2px; }
+  .doc-issuer{ text-align:right; font-size:11.5px; line-height:1.7; color:#333; margin-top:18px; }
+  .doc-issuer b{ font-size:13.5px; display:block; margin-bottom:3px; }
+  .doc-cancel-note{ font-size:12.5px; font-weight:700; color:#a33; margin-top:10px; }
+  .doc-checklist{ border:1px solid #bbb; border-radius:8px; padding:12px 16px; margin-top:16px; }
+  .doc-checklist-title{ font-size:12px; font-weight:700; color:#333; margin-bottom:10px; }
+  .doc-check-row{ display:flex; gap:26px; flex-wrap:wrap; margin-bottom:8px; }
+  .doc-check-row label{ display:flex; align-items:center; gap:7px; font-size:13.5px; font-weight:700; color:#1c1c1c; }
+  .chk-box{ display:inline-block; width:14px; height:14px; border:1.5px solid #1c1c1c; flex:none; }
+  .doc-check-note{ font-size:11px; color:#555; margin-top:2px; }
+
+  .quote-hist{ margin-top:22px; }
+  .quote-hist h3{ font-size:14px; margin-bottom:10px; }
+  .hist-item{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+  .hist-item:last-child{ border-bottom:none; }
+  .hist-item .who{ font-weight:700; }
+  .hist-item .meta{ color:var(--ink-soft); font-size:11.5px; }
+
+  /* ---------- password gate ---------- */
+  #pwGate{ position:fixed; inset:0; background:var(--paper); color:var(--ink); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px; }
+  #pwGate .pw-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:28px; max-width:320px; width:100%; box-shadow:var(--shadow); text-align:center; }
+  #pwGate h2{ font-size:18px; margin-bottom:6px; }
+  #pwGate p{ font-size:12.5px; color:var(--ink-soft); margin:0 0 16px; }
+  #pwGate input{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); margin-bottom:12px; font-size:14px; }
+  #pwGate button{ width:100%; padding:10px; border-radius:8px; border:none; background:var(--accent); color:var(--accent-ink); font-weight:700; font-size:14px; cursor:pointer; }
+  #pwGate .pw-error{ color:var(--danger); font-size:12px; margin-top:10px; display:none; }
+</style>
+</head>
+<body>
+
+<div id="pwGate">
+  <div class="pw-card">
+    <h2>修理台帳</h2>
+    <p>合言葉を入力してください</p>
+    <input type="password" id="pwInput" autocomplete="off">
+    <button id="pwSubmit">入室する</button>
+    <div class="pw-error" id="pwError">合言葉が違います</div>
+  </div>
+</div>
+
+<header class="app-bar">
+  <div class="brand">
+    <div class="mark">修</div>
+    <div>
+      <h1>修理台帳</h1>
+      <small>修理受付・見積書管理</small>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button data-view="repairs" class="active">修理一覧</button>
+    <button data-view="quotes">見積書</button>
+    <button data-view="destinations">修理先</button>
+    <button data-view="ks">KS専用</button>
+  </nav>
+  <span class="roflag" id="roflag" hidden>閲覧のみ</span>
+</header>
+
+<main>
+  <!-- ============ REPAIRS VIEW ============ -->
+  <section class="view active" id="view-repairs">
+    <div class="stat-row" id="statRow"></div>
+
+    <div class="toolbar">
+      <input type="search" id="searchInput" placeholder="管理番号・お客様名・機種・シリアル番号で検索">
+      <div class="chip-group" id="statusFilter">
+        <button class="chip active" data-status="">すべて</button>
+      </div>
+      <button class="btn btn-primary" id="btnNewRepair" style="margin-left:auto;">＋ 新規登録</button>
+    </div>
+
+    <div class="card">
+      <div class="table-scroll">
+      <table class="repair-table" id="repairTable">
+        <thead>
+          <tr>
+            <th>管理番号</th><th>受付日</th><th>店舗</th><th>お客様</th><th>商品</th><th>故障内容</th>
+            <th>ステータス</th><th>区分</th><th>見積金額</th><th>備考</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="repairBody"></tbody>
+      </table>
+      </div>
+      <div class="empty-state" id="repairEmpty" hidden>
+        <b>まだ修理受付がありません</b>
+        「＋ 新規登録」から最初の1件を登録しましょう。
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUOTES VIEW ============ -->
+  <section class="view" id="view-quotes">
+    <div class="quote-grid">
+      <div class="quote-form">
+        <h3>見積書の作成</h3>
+        <div class="field-row">
+          <div class="field"><label>見積日</label><input type="date" id="qDate"></div>
+          <div class="field"><label>見積番号</label><input type="text" id="qNo" class="mono" readonly></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>宛先（お客様名）</label><input type="text" id="qCustomer" placeholder="山田 太郎 様"></div>
+          <div class="field">
+            <label>区分</label>
+            <select id="qCharge">
+              <option value="paid">有償</option>
+              <option value="free">無償</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field store-picker" id="qStorePicker">
+          <label>発行元店舗</label>
+          <div class="store-picker-tabs">
+            <button type="button" class="spt active" data-mode="code">コードで指定</button>
+            <button type="button" class="spt" data-mode="browse">会社から選ぶ</button>
+          </div>
+          <div class="store-mode store-mode-code">
+            <input type="text" class="store-code-input" inputmode="numeric" maxlength="6" placeholder="店舗コード（5桁）" autocomplete="off">
+            <div class="store-list" hidden></div>
+          </div>
+          <div class="store-mode store-mode-browse" hidden>
+            <select class="store-company-select"><option value="">会社を選択</option></select>
+            <select class="store-name-select" disabled><option value="">店舗を選択</option></select>
+          </div>
+          <div class="store-preview" hidden></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field"><label>メーカー</label><input type="text" id="qMaker"></div>
+          <div class="field"><label>商品名</label><input type="text" id="qModel"></div>
+        </div>
+        <div class="field"><label>故障内容</label><textarea id="qIssue" rows="2"></textarea></div>
+        <div class="field"><label>修理内容</label><textarea id="qRepairContent" rows="2"></textarea></div>
+        <div class="field"><label>交換品名</label><input type="text" id="qPartName"></div>
+        <div class="field"><label>キャンセル料（見積NG時・ケーズHD有償のみ表示）</label><input type="text" id="qCancelFee" placeholder="メーカーから自動入力／該当なしは手入力"></div>
+
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--ink-soft);">明細</label>
+          <table class="items-table" id="itemsTable">
+            <thead><tr>
+              <th class="col-name">品目</th><th class="col-qty">数量</th><th class="col-price">単価</th><th class="col-amt">金額</th><th class="col-del"></th>
+            </tr></thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
+          <button class="btn btn-sm" id="btnAddItem" style="margin-top:8px;">＋ 行を追加</button>
+        </div>
+
+        <div class="field" style="max-width:160px;">
+          <label>消費税率</label>
+          <select id="qTaxRate">
+            <option value="0.1">10%</option>
+            <option value="0.08">8%</option>
+            <option value="0">0%（非課税）</option>
+          </select>
+        </div>
+
+        <div class="totals">
+          <div class="line">小計 <b class="mono" id="sumSubtotal">¥0</b></div>
+          <div class="line">消費税 <b class="mono" id="sumTax">¥0</b></div>
+          <div class="line grand">合計 <b class="mono" id="sumTotal">¥0</b></div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn" id="btnQuoteReset">クリア</button>
+          <button class="btn btn-primary" id="btnQuoteSave">見積書を保存</button>
+          <button class="btn" id="btnQuotePdf">PDFを保存</button>
+        </div>
+
+        <div class="quote-hist">
+          <h3>保存した見積書</h3>
+          <div id="quoteHistList"></div>
+        </div>
+      </div>
+
+      <div>
+        <div id="quotePreview">
+          <div class="doc-head">
+            <div class="doc-title" id="pvTitle">御 見 積 書</div>
+            <div class="doc-meta">
+              発行日：<span id="pvDate">-</span><br>
+              見積番号：<span id="pvNo" class="mono">-</span>
+              <div class="doc-from" id="pvFrom">店舗未選択</div>
+            </div>
+          </div>
+          <div class="doc-parties">
+            <div class="doc-to"><span id="pvCustomer">お客様名未入力</span></div>
+          </div>
+          <div class="doc-greeting">
+            平素は格別のお引き立てを賜り、厚く御礼申し上げます。<br>
+            貴社よりお預かりした修理品の修理見積をご連絡致します。<br>
+            お客様へのご案内と、弊社への御解答をお願い申し上げます。
+          </div>
+          <div class="doc-info" id="pvInfo" hidden>
+            <div class="doc-info-row" id="pvMakerRow"><span>メーカー</span><b id="pvMaker">-</b></div>
+            <div class="doc-info-row" id="pvModelRow"><span>商品名</span><b id="pvModel">-</b></div>
+            <div class="doc-info-row" id="pvIssueRow"><span>故障内容</span><b id="pvIssue">-</b></div>
+            <div class="doc-info-row" id="pvRepairRow"><span>修理内容</span><b id="pvRepairContent">-</b></div>
+            <div class="doc-info-row" id="pvPartRow"><span>交換品名</span><b id="pvPartName">-</b></div>
+          </div>
+          <div class="doc-amount-box" id="pvAmountBox">
+            <span>ご請求金額（税込）</span>
+            <b class="mono" id="pvGrand">¥0</b>
+          </div>
+          <table class="doc-items" id="pvItemsTable">
+            <thead><tr><th>品目</th><th class="num">数量</th><th class="num">単価</th><th class="num">金額</th></tr></thead>
+            <tbody id="pvItems"></tbody>
+          </table>
+          <div class="doc-totals" id="pvTotalsBox">
+            <div class="l">小計<span id="pvSubtotal">¥0</span></div>
+            <div class="l">消費税<span id="pvTax">¥0</span></div>
+            <div class="l grand">合計<span id="pvTotal">¥0</span></div>
+          </div>
+          <div class="doc-cancel-note" id="pvCancelNote" hidden>見積NGの場合、キャンセル料<b id="pvCancelFeeAmt">-</b>発生致します。</div>
+          <div class="doc-checklist">
+            <div class="doc-checklist-title">販売店先 ご確認欄</div>
+            <div class="doc-check-row" id="pvCheckPaid">
+              <label><span class="chk-box"></span>修理進行</label>
+              <label><span class="chk-box"></span>中止・返却</label>
+              <label><span class="chk-box"></span>中止・廃棄</label>
+            </div>
+            <div class="doc-check-row" id="pvCheckFree" hidden>
+              <label><span class="chk-box"></span>修理進行</label>
+              <label><span class="chk-box"></span>その他</label>
+            </div>
+            <div class="doc-check-note">※有償・無償を問わず、いずれかに☑を入れてご返信をお願いいたします。</div>
+          </div>
+          <div class="doc-issuer">
+            <b>吉井電気㈱福岡支店　担当：</b>
+            〒811-2304　福岡県粕屋郡粕屋町仲原2551<br>
+            ℡092-626-8055　Fax092-626-8066
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DESTINATIONS VIEW ============ -->
+  <section class="view" id="view-destinations">
+    <div class="toolbar">
+      <input type="search" id="destSearchInput" placeholder="メーカー名・メーカーコードで検索">
+      <button class="btn btn-primary" id="btnNewDest" style="margin-left:auto;">＋ マスタに追加</button>
+    </div>
+    <div class="card">
+      <div class="table-scroll">
+      <table class="repair-table" id="destTable">
+        <thead>
+          <tr>
+            <th>メーカーコード</th><th>メーカー名</th><th>郵便番号</th><th>発送先住所</th>
+            <th>電話番号</th><th>FAX番号</th><th>送料区分</th><th>特記事項・受付窓口</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="destBody"></tbody>
+      </table>
+      </div>
+      <div class="empty-state" id="destEmpty" hidden>
+        <b>修理先マスタがまだ登録されていません</b>
+        「＋ マスタに追加」から登録しましょう。
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ KS (ケーズデンキ専用) VIEW ============ -->
+  <section class="view" id="view-ks">
+    <div class="toolbar">
+      <input type="search" id="ksSearchInput" placeholder="メーカー名で検索">
+      <button class="btn btn-primary" id="btnNewKs" style="margin-left:auto;">＋ マスタに追加</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px;">ケーズデンキ 有償見積キャンセル料マスタ</h3>
+      <div class="table-scroll">
+      <table class="repair-table" id="ksTable">
+        <thead>
+          <tr>
+            <th>メーカー名</th><th>キャンセル料</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="ksBody"></tbody>
+      </table>
+      </div>
+      <div class="empty-state" id="ksEmpty" hidden>
+        <b>KSキャンセル料マスタがまだ登録されていません</b>
+        「＋ マスタに追加」から登録しましょう。
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- repair edit sheet -->
+<div class="overlay" id="repairOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="sheetTitle">修理受付の登録</h3>
+      <button class="btn btn-ghost btn-sm" id="btnCloseSheet">閉じる</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field-row">
+        <div class="field"><label>管理番号</label><input type="text" id="fManageNo" class="mono"></div>
+        <div class="field">
+          <label>区分</label>
+          <select id="fChargeType">
+            <option value="paid">有償</option>
+            <option value="free">無償</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>受付日</label><input type="date" id="fDate"></div>
+        <div class="field">
+          <label>ステータス</label>
+          <select id="fStatus"></select>
+        </div>
+      </div>
+
+      <div class="field store-picker" id="rStorePicker">
+        <label>店舗</label>
+        <div class="store-picker-tabs">
+          <button type="button" class="spt active" data-mode="code">コードで指定</button>
+          <button type="button" class="spt" data-mode="browse">会社から選ぶ</button>
+        </div>
+        <div class="store-mode store-mode-code">
+          <input type="text" class="store-code-input" inputmode="numeric" maxlength="6" placeholder="店舗コード（5桁）" autocomplete="off">
+          <div class="store-list" hidden></div>
+        </div>
+        <div class="store-mode store-mode-browse" hidden>
+          <select class="store-company-select"><option value="">会社を選択</option></select>
+          <select class="store-name-select" disabled><option value="">店舗を選択</option></select>
+        </div>
+        <div class="store-preview" hidden></div>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>お客様名</label><input type="text" id="fCustomer"></div>
+        <div class="field"><label>電話番号</label><input type="text" id="fPhone"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>メーカー</label><input type="text" id="fMaker" list="ksMakerList" placeholder="選択または入力" autocomplete="off"></div>
+        <div class="field"><label>機種名</label><input type="text" id="fModel"></div>
+      </div>
+      <div class="field"><label>シリアル番号</label><input type="text" id="fSerial" class="mono"></div>
+      <div class="field"><label>故障内容</label><textarea id="fIssue"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>見積金額（円）</label><input type="number" id="fAmount" min="0" step="1"></div>
+        <div class="field"><label>備考</label><textarea id="fRemarks" rows="2"></textarea></div>
+      </div>
+      <div class="field"><label>メモ</label><textarea id="fMemo"></textarea></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-danger" id="btnDeleteRepair" hidden>削除</button>
+      <button class="btn" id="btnCancelRepair" style="margin-left:auto;">キャンセル</button>
+      <button class="btn btn-primary" id="btnSaveRepair">保存</button>
+    </div>
+  </div>
+</div>
+<datalist id="ksMakerList"></datalist>
+
+<!-- destination (repair-master) edit sheet -->
+<div class="overlay" id="destOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="destSheetTitle">修理先の登録</h3>
+      <button class="btn btn-ghost btn-sm" id="btnCloseDestSheet">閉じる</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field-row">
+        <div class="field"><label>メーカーコード</label><input type="text" id="dCode" class="mono"></div>
+        <div class="field"><label>郵便番号</label><input type="text" id="dZip" class="mono" placeholder="000-0000"></div>
+      </div>
+      <div class="field"><label>メーカー名</label><input type="text" id="dName"></div>
+      <div class="field"><label>発送先住所</label><textarea id="dAddress" rows="2"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>電話番号</label><input type="text" id="dTel"></div>
+        <div class="field"><label>FAX番号</label><input type="text" id="dFax"></div>
+      </div>
+      <div class="field">
+        <label>送料区分</label>
+        <select id="dShipType">
+          <option value="着払い">着払い</option>
+          <option value="元払い">元払い</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="field"><label>特記事項・受付窓口</label><textarea id="dNote"></textarea></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-danger" id="btnDeleteDest" hidden>削除</button>
+      <button class="btn" id="btnCancelDest" style="margin-left:auto;">キャンセル</button>
+      <button class="btn btn-primary" id="btnSaveDest">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- KS cancel-fee edit sheet -->
+<div class="overlay" id="ksOverlay" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h3 id="ksSheetTitle">KSキャンセル料の登録</h3>
+      <button class="btn btn-ghost btn-sm" id="btnCloseKsSheet">閉じる</button>
+    </div>
+    <div class="sheet-body">
+      <div class="field"><label>メーカー名</label><input type="text" id="kMaker"></div>
+      <div class="field"><label>キャンセル料</label><input type="text" id="kFee" placeholder="例：1500　または　帳合変更"></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-danger" id="btnDeleteKs" hidden>削除</button>
+      <button class="btn" id="btnCancelKs" style="margin-left:auto;">キャンセル</button>
+      <button class="btn btn-primary" id="btnSaveKs">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-box" id="confirmBox" hidden>
+  <div class="confirm-card">
+    <p id="confirmMsg"></p>
+    <div class="row">
+      <button class="btn" id="confirmNo">キャンセル</button>
+      <button class="btn btn-danger" id="confirmYes">削除する</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STATUS = {
+    received:{label:"受付", cls:"st-received"},
+    inspecting:{label:"点検中", cls:"st-progress"},
+    estimating:{label:"見積中", cls:"st-progress"},
+    faxed_to_store:{label:"販売店先見積FAX済", cls:"st-progress"},
+    maker_replied:{label:"メーカー回答済", cls:"st-progress"},
+    maker_shipping:{label:"メーカー発送予定", cls:"st-done"},
+    shipped:{label:"当社発送済", cls:"st-delivered"}
+  };
+  var STATUS_BY_CHARGE = {
+    free: ["received","inspecting","maker_shipping","shipped"],
+    paid: ["received","inspecting","estimating","faxed_to_store","maker_replied","maker_shipping","shipped"]
+  };
+  var CHARGE = {
+    paid:{label:"有償", cls:"charge-paid"},
+    free:{label:"無償", cls:"charge-free"}
+  };
+
+  var state = {
+    stores: [],
+    storeCompanies: [],
+    repairs: [],
+    quotes: [],
+    filterStatus: "",
+    searchText: "",
+    editingId: null,
+    canWrite: true,
+    quoteItems: [],
+    quoteStore: null,
+    destinations: [],
+    destSearchText: "",
+    editingDestId: null,
+    ksFees: [],
+    ksSearchText: "",
+    editingKsId: null
+  };
+
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAIZrjraNUPaqhWppHyRaWp-LULoHfApyg",
+    authDomain: "syuridaicyou160.firebaseapp.com",
+    projectId: "syuridaicyou160",
+    storageBucket: "syuridaicyou160.firebasestorage.app",
+    messagingSenderId: "663070693390",
+    appId: "1:663070693390:web:fa1e8c9d480ac06b20445f"
+  };
+  var db = null;
+
+  function $(sel, root){ return (root||document).querySelector(sel); }
+  function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function fmtYen(n){ n = Number(n)||0; return "¥" + Math.round(n).toLocaleString("ja-JP"); }
+  function fmtDate(iso){ if(!iso) return "-"; var p = iso.split("-"); return p.length===3 ? (p[0]+"/"+p[1]+"/"+p[2]) : iso; }
+  function todayISO(){ var d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function todayShort(){ var d = new Date(); return d.getFullYear()+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getDate()).padStart(2,"0"); }
+  function appendRemark(existing, statusKey){
+    var label = (STATUS[statusKey] && STATUS[statusKey].label) || statusKey;
+    var entry = todayShort()+" "+label;
+    existing = (existing||"").trim();
+    return existing ? (existing+"→"+entry) : entry;
+  }
+  function toast(msg){
+    var t = $("#toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove("show"); }, 2400);
+  }
+
+  /* ---------------- capability bootstrap ---------------- */
+  async function boot(){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.firestore();
+    }catch(e){ console.error(e); db = null; }
+
+    await loadStores();
+    state.storeCompanies = computeCompanies();
+    initStorePicker($("#rStorePicker"));
+    initStorePicker($("#qStorePicker"), onQuoteStoreChange);
+
+    if(db){
+      db.collection("repairs").orderBy("receivedDate","desc").limit(500).onSnapshot(function(snap){
+        state.repairs = snap.docs.map(function(d){ var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+        renderStats(); renderRepairs();
+      }, function(err){ console.error(err); });
+
+      db.collection("quotes").orderBy("createdAt","desc").limit(50).onSnapshot(function(snap){
+        state.quotes = snap.docs.map(function(d){ var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+        renderQuoteHistory();
+      }, function(err){ console.error(err); });
+
+      db.collection("destinations").orderBy("code","asc").limit(500).onSnapshot(function(snap){
+        state.destinations = snap.docs.map(function(d){ var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+        renderDestinations();
+      }, function(err){ console.error(err); });
+
+      db.collection("ksFees").orderBy("maker","asc").limit(500).onSnapshot(function(snap){
+        state.ksFees = snap.docs.map(function(d){ var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+        renderKsFees();
+      }, function(err){ console.error(err); });
+    } else {
+      $("#repairEmpty").hidden = false;
+      $("#repairEmpty").querySelector("b").textContent = "データベースに接続できません";
+      $("#repairEmpty").lastChild.textContent = "しばらくしてページを再読み込みしてください。";
+      renderStats();
+      $("#destEmpty").hidden = false;
+      $("#destEmpty").querySelector("b").textContent = "データベースに接続できません";
+      $("#destEmpty").lastChild.textContent = "しばらくしてページを再読み込みしてください。";
+    }
+
+    renderStatusFilterChips();
+    resetQuoteForm();
+    wireEvents();
+
+    var hash = (location.hash||"").replace("#","");
+    if(hash==="quotes"||hash==="destinations"||hash==="ks") switchView(hash);
+  }
+
+  function handleWriteError(err){
+    console.error(err);
+    toast("保存に失敗しました。しばらくして再度お試しください");
+  }
+
+  /* ---------------- store master ---------------- */
+  async function loadStores(){
+    try{
+      var res = await fetch("stores.csv");
+      var text = await res.text();
+      var lines = text.replace(/\r/g,"").split("\n").filter(Boolean);
+      lines.shift();
+      state.stores = lines.map(function(line){
+        var p = line.split(",");
+        return { code:p[0]||"", company:p[1]||"", name:p[2]||"", zip:p[3]||"", address:p[4]||"", tel:p[5]||"", fax:p[6]||"" };
+      });
+    }catch(e){ console.error("store load failed", e); state.stores = []; }
+  }
+
+  function computeCompanies(){
+    var seen = {}, list = [];
+    state.stores.forEach(function(s){ if(s.company && !seen[s.company]){ seen[s.company]=true; list.push(s.company); } });
+    return list;
+  }
+
+  function initStorePicker(root, onSelect){
+    var tabs = $all(".spt", root);
+    var codeWrap = root.querySelector(".store-mode-code");
+    var browseWrap = root.querySelector(".store-mode-browse");
+    var codeInput = root.querySelector(".store-code-input");
+    var codeList = root.querySelector(".store-list");
+    var companySel = root.querySelector(".store-company-select");
+    var nameSel = root.querySelector(".store-name-select");
+    var preview = root.querySelector(".store-preview");
+
+    companySel.innerHTML = '<option value="">会社を選択</option>' +
+      state.storeCompanies.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join("");
+
+    function renderPreview(s){
+      preview.hidden = false;
+      preview.innerHTML = "<b>"+esc(s.company)+" "+esc(s.name)+"</b>（"+esc(s.code)+"）<br>" +
+        (s.zip?("〒"+esc(s.zip)+" "):"") + esc(s.address||"") + "<br>" +
+        (s.tel?("TEL "+esc(s.tel)+" "):"") + (s.fax?("FAX "+esc(s.fax)):"");
+    }
+
+    function populateNames(company, selectCode){
+      var list = company ? state.stores.filter(function(s){ return s.company === company; }) : [];
+      nameSel.innerHTML = '<option value="">店舗を選択</option>' +
+        list.map(function(s){ return '<option value="'+esc(s.code)+'">'+esc(s.name)+'（'+esc(s.code)+'）</option>'; }).join("");
+      nameSel.disabled = !company;
+      if(selectCode) nameSel.value = selectCode;
+    }
+
+    root._selected = null;
+    root._set = function(s){
+      root._selected = s || null;
+      if(s){
+        codeInput.value = s.code;
+        companySel.value = s.company;
+        populateNames(s.company, s.code);
+        renderPreview(s);
+      } else {
+        codeInput.value = "";
+        companySel.value = "";
+        populateNames("");
+        preview.hidden = true;
+      }
+      codeList.hidden = true; codeList.innerHTML = "";
+      if(onSelect) onSelect(s || null);
+    };
+
+    tabs.forEach(function(t){
+      t.addEventListener("click", function(){
+        tabs.forEach(function(x){ x.classList.remove("active"); });
+        t.classList.add("active");
+        var mode = t.dataset.mode;
+        codeWrap.hidden = mode !== "code";
+        browseWrap.hidden = mode !== "browse";
+      });
+    });
+
+    codeInput.addEventListener("input", function(){
+      var raw = codeInput.value.replace(/[^0-9]/g,"");
+      if(raw !== codeInput.value) codeInput.value = raw;
+      if(!raw){
+        root._selected = null; preview.hidden = true; codeList.hidden = true; codeList.innerHTML="";
+        if(onSelect) onSelect(null); return;
+      }
+      var exact = state.stores.find(function(s){ return s.code === raw; });
+      if(exact){ root._set(exact); return; }
+      root._selected = null; preview.hidden = true;
+      if(onSelect) onSelect(null);
+      var matches = state.stores.filter(function(s){ return s.code.indexOf(raw) === 0; }).slice(0,20);
+      if(!matches.length){ codeList.hidden = true; codeList.innerHTML=""; return; }
+      codeList.innerHTML = matches.map(function(s){
+        return '<div class="store-opt" data-code="'+esc(s.code)+'">' +
+          '<span class="store-opt-name mono">'+esc(s.code)+'</span>' +
+          '<span class="store-opt-addr">'+esc(s.company)+" "+esc(s.name)+'</span></div>';
+      }).join("");
+      codeList.hidden = false;
+    });
+
+    codeList.addEventListener("click", function(e){
+      var opt = e.target.closest(".store-opt");
+      if(!opt) return;
+      var s = state.stores.find(function(x){ return x.code === opt.dataset.code; });
+      if(s) root._set(s);
+    });
+    document.addEventListener("click", function(e){
+      if(!codeWrap.contains(e.target)) codeList.hidden = true;
+    });
+
+    companySel.addEventListener("change", function(){
+      populateNames(companySel.value);
+      root._selected = null; preview.hidden = true;
+      if(onSelect) onSelect(null);
+    });
+    nameSel.addEventListener("change", function(){
+      var s = state.stores.find(function(x){ return x.code === nameSel.value; });
+      root._set(s || null);
+    });
+  }
+
+  /* ---------------- view switching ---------------- */
+  function switchView(name){
+    $all(".view").forEach(function(v){ v.classList.toggle("active", v.id === "view-"+name); });
+    $all("nav.tabs button").forEach(function(b){ b.classList.toggle("active", b.dataset.view === name); });
+    location.hash = name;
+  }
+
+  /* ---------------- repairs: stats + list ---------------- */
+  var STATUS_SUMMARY_GROUP = {
+    received:"received",
+    inspecting:"in_progress", estimating:"in_progress", faxed_to_store:"in_progress",
+    maker_replied:"in_progress", maker_shipping:"in_progress",
+    shipped:"done"
+  };
+  var STATUS_SUMMARY_DEFS = [
+    ["received","st-received","受付"],
+    ["in_progress","st-progress","メーカー預かり中"],
+    ["done","st-done","完了"]
+  ];
+  function renderStats(){
+    var counts = {received:0, in_progress:0, done:0};
+    state.repairs.forEach(function(r){
+      var g = STATUS_SUMMARY_GROUP[r.status] || "received";
+      counts[g]++;
+    });
+    $("#statRow").innerHTML = STATUS_SUMMARY_DEFS.map(function(d){
+      return '<div class="stat '+d[1]+'"><b>'+counts[d[0]]+'</b><span>'+d[2]+'</span></div>';
+    }).join("");
+  }
+
+  function renderStatusFilterChips(){
+    var box = $("#statusFilter");
+    var extra = Object.keys(STATUS).map(function(k){
+      return '<button class="chip" data-status="'+k+'">'+esc(STATUS[k].label)+'</button>';
+    }).join("");
+    box.insertAdjacentHTML("beforeend", extra);
+  }
+
+  function filteredRepairs(){
+    var q = state.searchText.trim();
+    return state.repairs.filter(function(r){
+      if(state.filterStatus && r.status !== state.filterStatus) return false;
+      if(!q) return true;
+      var hay = [r.customerName, r.model, r.serial, r.maker, r.managementNo].join(" ").toLowerCase();
+      return hay.indexOf(q.toLowerCase()) > -1;
+    });
+  }
+
+  function renderRepairs(){
+    var list = filteredRepairs();
+    var body = $("#repairBody");
+    $("#repairEmpty").hidden = state.repairs.length > 0;
+    if(!state.repairs.length){ body.innerHTML=""; return; }
+
+    body.innerHTML = list.map(function(r){
+      var st = STATUS[r.status] || STATUS.received;
+      var chg = CHARGE[r.chargeType] || CHARGE.paid;
+      var statusOpts = statusKeysFor(r.chargeType).map(function(k){
+        return '<option value="'+k+'"'+(k===r.status?" selected":"")+'>'+STATUS[k].label+'</option>';
+      }).join("");
+      return '<tr data-id="'+r.id+'">' +
+        '<td data-label="管理番号" class="mono">'+esc(r.managementNo||"-")+'</td>' +
+        '<td data-label="受付日" class="mono">'+esc(fmtDate(r.receivedDate))+'</td>' +
+        '<td data-label="店舗">'+esc(r.storeName||"-")+'<span class="cell-sub">'+esc(r.storeCompany||"")+'</span></td>' +
+        '<td data-label="お客様">'+esc(r.customerName||"-")+'<span class="cell-sub">'+esc(r.customerPhone||"")+'</span></td>' +
+        '<td data-label="商品">'+esc(r.model||"-")+'<span class="cell-sub">'+esc(r.maker||"")+'</span></td>' +
+        '<td data-label="故障内容" class="truncate" title="'+esc(r.issue||"")+'">'+esc(r.issue||"-")+'</td>' +
+        '<td data-label="ステータス">'+ (state.canWrite ?
+            ('<select class="status-select" data-id="'+r.id+'">'+statusOpts+'</select>') :
+            ('<span class="pill '+st.cls+'">'+st.label+'</span>') ) +'</td>' +
+        '<td data-label="区分"><span class="pill '+chg.cls+'">'+chg.label+'</span></td>' +
+        '<td data-label="見積金額" class="mono">'+fmtYen(r.estimateAmount)+'</td>' +
+        '<td data-label="備考" class="truncate" title="'+esc(r.remarks||"")+'">'+esc(r.remarks||"-")+'</td>' +
+        '<td><div class="row-actions">' +
+          '<button class="btn btn-sm" data-act="quote" data-id="'+r.id+'">見積作成</button>' +
+          '<button class="btn btn-sm" data-act="edit" data-id="'+r.id+'">編集</button>' +
+          '<button class="btn btn-sm btn-danger" data-act="delete" data-id="'+r.id+'">削除</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  /* ---------------- repair edit sheet ---------------- */
+  function statusKeysFor(chargeType){
+    return STATUS_BY_CHARGE[chargeType] || STATUS_BY_CHARGE.paid;
+  }
+  function renderStatusOptions(chargeType, preferred){
+    var keys = statusKeysFor(chargeType);
+    var value = keys.indexOf(preferred) > -1 ? preferred : keys[0];
+    $("#fStatus").innerHTML = keys.map(function(k){
+      return '<option value="'+k+'"'+(k===value?" selected":"")+'>'+STATUS[k].label+'</option>';
+    }).join("");
+  }
+
+  var REPAIR_LOCK_IDS = ["fChargeType","fDate","fStatus","fPhone","fMaker","fModel","fSerial","fAmount","fMemo"];
+  function setRepairFieldsLocked(locked){
+    REPAIR_LOCK_IDS.forEach(function(id){ $("#"+id).disabled = locked; });
+    var picker = $("#rStorePicker");
+    $all(".spt", picker).forEach(function(b){ b.disabled = locked; });
+    picker.querySelector(".store-code-input").disabled = locked;
+    picker.querySelector(".store-company-select").disabled = locked;
+    picker.querySelector(".store-name-select").disabled = locked;
+    picker.classList.toggle("locked", locked);
+  }
+
+  function openRepairSheet(id){
+    state.editingId = id || null;
+    var r = id ? state.repairs.find(function(x){ return x.id===id; }) : null;
+    $("#sheetTitle").textContent = r ? "修理受付の編集" : "修理受付の登録";
+    $("#btnDeleteRepair").hidden = !r;
+    $("#fDate").value = r ? r.receivedDate : todayISO();
+    $("#fManageNo").value = r ? (r.managementNo||"") : "";
+    $("#fChargeType").value = r ? (r.chargeType||"paid") : "paid";
+    renderStatusOptions($("#fChargeType").value, r ? r.status : "received");
+    $("#fCustomer").value = r ? r.customerName||"" : "";
+    $("#fPhone").value = r ? r.customerPhone||"" : "";
+    $("#fMaker").value = r ? r.maker||"" : "";
+    $("#fModel").value = r ? r.model||"" : "";
+    $("#fSerial").value = r ? r.serial||"" : "";
+    $("#fIssue").value = r ? r.issue||"" : "";
+    $("#fAmount").value = r ? (r.estimateAmount||0) : "";
+    $("#fRemarks").value = r ? (r.remarks||"") : appendRemark("", $("#fStatus").value);
+    $("#fMemo").value = r ? r.memo||"" : "";
+
+    var picker = $("#rStorePicker");
+    if(r && r.storeCode){
+      picker._set({code:r.storeCode, company:r.storeCompany, name:r.storeName, zip:r.storeZip, address:r.storeAddress, tel:r.storeTel, fax:r.storeFax});
+    } else {
+      picker._set(null);
+    }
+    setRepairFieldsLocked(!!r);
+    $("#repairOverlay").hidden = false;
+  }
+  function closeRepairSheet(){ $("#repairOverlay").hidden = true; state.editingId = null; }
+
+  async function saveRepairFromForm(){
+    if(!db){ toast("データ機能を利用できません"); return; }
+    var s = $("#rStorePicker")._selected;
+    var data = {
+      receivedDate: $("#fDate").value || todayISO(),
+      status: $("#fStatus").value,
+      managementNo: $("#fManageNo").value.trim(),
+      chargeType: $("#fChargeType").value,
+      storeCode: s ? s.code : "",
+      storeCompany: s ? s.company : "",
+      storeName: s ? s.name : "",
+      storeZip: s ? s.zip : "",
+      storeAddress: s ? s.address : "",
+      storeTel: s ? s.tel : "",
+      storeFax: s ? s.fax : "",
+      customerName: $("#fCustomer").value.trim(),
+      customerPhone: $("#fPhone").value.trim(),
+      maker: $("#fMaker").value.trim(),
+      model: $("#fModel").value.trim(),
+      serial: $("#fSerial").value.trim(),
+      issue: $("#fIssue").value.trim(),
+      estimateAmount: Number($("#fAmount").value)||0,
+      remarks: $("#fRemarks").value.trim(),
+      memo: $("#fMemo").value.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    try{
+      if(state.editingId){
+        await db.collection("repairs").doc(state.editingId).update(data);
+      } else {
+        data.createdAt = data.updatedAt;
+        await db.collection("repairs").add(data);
+      }
+      toast("保存しました");
+      closeRepairSheet();
+    }catch(err){ handleWriteError(err); }
+  }
+
+  async function deleteRepairConfirmed(id){
+    if(!db) return;
+    try{ await db.collection("repairs").doc(id).delete(); toast("削除しました"); closeRepairSheet(); }
+    catch(err){ handleWriteError(err); }
+  }
+
+  /* ---------------- destinations (repair-source master) ---------------- */
+  function filteredDestinations(){
+    var q = state.destSearchText.trim().toLowerCase();
+    if(!q) return state.destinations;
+    return state.destinations.filter(function(d){
+      var hay = [d.code, d.name].join(" ").toLowerCase();
+      return hay.indexOf(q) > -1;
+    });
+  }
+
+  function renderDestinations(){
+    var list = filteredDestinations();
+    var body = $("#destBody");
+    $("#destEmpty").hidden = state.destinations.length > 0;
+    if(!state.destinations.length){ body.innerHTML=""; return; }
+
+    body.innerHTML = list.map(function(d){
+      return '<tr data-id="'+d.id+'">' +
+        '<td data-label="メーカーコード" class="mono">'+esc(d.code||"-")+'</td>' +
+        '<td data-label="メーカー名">'+esc(d.name||"-")+'</td>' +
+        '<td data-label="郵便番号" class="mono">'+esc(d.zip||"-")+'</td>' +
+        '<td data-label="発送先住所" class="truncate" title="'+esc(d.address||"")+'">'+esc(d.address||"-")+'</td>' +
+        '<td data-label="電話番号" class="mono">'+esc(d.tel||"-")+'</td>' +
+        '<td data-label="FAX番号" class="mono">'+esc(d.fax||"-")+'</td>' +
+        '<td data-label="送料区分">'+esc(d.shipType||"-")+'</td>' +
+        '<td data-label="特記事項・受付窓口" class="truncate" title="'+esc(d.note||"")+'">'+esc(d.note||"-")+'</td>' +
+        '<td><div class="row-actions">' +
+          '<button class="btn btn-sm" data-act="edit-dest" data-id="'+d.id+'">編集</button>' +
+          '<button class="btn btn-sm btn-danger" data-act="delete-dest" data-id="'+d.id+'">削除</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  function openDestinationSheet(id){
+    state.editingDestId = id || null;
+    var d = id ? state.destinations.find(function(x){ return x.id===id; }) : null;
+    $("#destSheetTitle").textContent = d ? "修理先の編集" : "修理先の登録";
+    $("#btnDeleteDest").hidden = !d;
+    $("#dCode").value = d ? (d.code||"") : "";
+    $("#dZip").value = d ? (d.zip||"") : "";
+    $("#dName").value = d ? (d.name||"") : "";
+    $("#dAddress").value = d ? (d.address||"") : "";
+    $("#dTel").value = d ? (d.tel||"") : "";
+    $("#dFax").value = d ? (d.fax||"") : "";
+    $("#dShipType").value = d ? (d.shipType||"着払い") : "着払い";
+    $("#dNote").value = d ? (d.note||"") : "";
+    $("#destOverlay").hidden = false;
+  }
+  function closeDestinationSheet(){ $("#destOverlay").hidden = true; state.editingDestId = null; }
+
+  async function saveDestinationFromForm(){
+    if(!db){ toast("データ機能を利用できません"); return; }
+    var data = {
+      code: $("#dCode").value.trim(),
+      zip: $("#dZip").value.trim(),
+      name: $("#dName").value.trim(),
+      address: $("#dAddress").value.trim(),
+      tel: $("#dTel").value.trim(),
+      fax: $("#dFax").value.trim(),
+      shipType: $("#dShipType").value,
+      note: $("#dNote").value.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    try{
+      if(state.editingDestId){
+        await db.collection("destinations").doc(state.editingDestId).update(data);
+      } else {
+        data.createdAt = data.updatedAt;
+        await db.collection("destinations").add(data);
+      }
+      toast("保存しました");
+      closeDestinationSheet();
+    }catch(err){ handleWriteError(err); }
+  }
+
+  async function deleteDestinationConfirmed(id){
+    if(!db) return;
+    try{ await db.collection("destinations").doc(id).delete(); toast("削除しました"); closeDestinationSheet(); }
+    catch(err){ handleWriteError(err); }
+  }
+
+  /* ---------------- KS (ケーズデンキ) cancel-fee master ---------------- */
+  function filteredKsFees(){
+    var q = state.ksSearchText.trim().toLowerCase();
+    if(!q) return state.ksFees;
+    return state.ksFees.filter(function(k){
+      return (k.maker||"").toLowerCase().indexOf(q) > -1;
+    });
+  }
+
+  function renderKsMakerList(){
+    var names = state.ksFees.map(function(k){ return k.maker; }).filter(Boolean);
+    names = names.filter(function(n, i){ return names.indexOf(n) === i; }).sort(function(a,b){ return a.localeCompare(b,"ja"); });
+    $("#ksMakerList").innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'; }).join("");
+  }
+
+  function renderKsFees(){
+    renderKsMakerList();
+    var list = filteredKsFees();
+    var body = $("#ksBody");
+    $("#ksEmpty").hidden = state.ksFees.length > 0;
+    if(!state.ksFees.length){ body.innerHTML=""; return; }
+
+    body.innerHTML = list.map(function(k){
+      return '<tr data-id="'+k.id+'">' +
+        '<td data-label="メーカー名">'+esc(k.maker||"-")+'</td>' +
+        '<td data-label="キャンセル料" class="mono">'+esc(k.fee||"-")+'</td>' +
+        '<td><div class="row-actions">' +
+          '<button class="btn btn-sm" data-act="edit-ks" data-id="'+k.id+'">編集</button>' +
+          '<button class="btn btn-sm btn-danger" data-act="delete-ks" data-id="'+k.id+'">削除</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  function openKsSheet(id){
+    state.editingKsId = id || null;
+    var k = id ? state.ksFees.find(function(x){ return x.id===id; }) : null;
+    $("#ksSheetTitle").textContent = k ? "KSキャンセル料の編集" : "KSキャンセル料の登録";
+    $("#btnDeleteKs").hidden = !k;
+    $("#kMaker").value = k ? (k.maker||"") : "";
+    $("#kFee").value = k ? (k.fee||"") : "";
+    $("#ksOverlay").hidden = false;
+  }
+  function closeKsSheet(){ $("#ksOverlay").hidden = true; state.editingKsId = null; }
+
+  async function saveKsFromForm(){
+    if(!db){ toast("データ機能を利用できません"); return; }
+    var data = {
+      maker: $("#kMaker").value.trim(),
+      fee: $("#kFee").value.trim(),
+      updatedAt: new Date().toISOString()
+    };
+    try{
+      if(state.editingKsId){
+        await db.collection("ksFees").doc(state.editingKsId).update(data);
+      } else {
+        data.createdAt = data.updatedAt;
+        await db.collection("ksFees").add(data);
+      }
+      toast("保存しました");
+      closeKsSheet();
+    }catch(err){ handleWriteError(err); }
+  }
+
+  async function deleteKsConfirmed(id){
+    if(!db) return;
+    try{ await db.collection("ksFees").doc(id).delete(); toast("削除しました"); closeKsSheet(); }
+    catch(err){ handleWriteError(err); }
+  }
+
+  /* ---------------- confirm dialog ---------------- */
+  function showConfirm(msg, onYes){
+    $("#confirmMsg").textContent = msg;
+    $("#confirmBox").hidden = false;
+    var yes = $("#confirmYes"), no = $("#confirmNo");
+    function cleanup(){ $("#confirmBox").hidden = true; yes.onclick=null; no.onclick=null; }
+    yes.onclick = function(){ cleanup(); onYes(); };
+    no.onclick = cleanup;
+  }
+
+  /* ---------------- quote builder ---------------- */
+  function newItemRow(name, qty, price){
+    return { name: name||"", qty: qty||1, price: price||0 };
+  }
+  function resetQuoteForm(){
+    state.quoteItems = [newItemRow()];
+    state.quoteStore = null;
+    $("#qDate").value = todayISO();
+    $("#qNo").value = genQuoteNo();
+    $("#qCustomer").value = "";
+    $("#qCharge").value = "paid";
+    $("#qMaker").value = "";
+    $("#qModel").value = "";
+    $("#qIssue").value = "";
+    $("#qRepairContent").value = "";
+    $("#qPartName").value = "";
+    $("#qCancelFee").value = "";
+    $("#qTaxRate").value = "0.1";
+    $("#qStorePicker")._set && $("#qStorePicker")._set(null);
+    renderItems();
+    renderQuotePreview();
+  }
+  function genQuoteNo(){
+    var d = new Date();
+    return "Q"+d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"-"+String(Math.floor(Math.random()*900+100));
+  }
+  function onQuoteStoreChange(s){ state.quoteStore = s; renderQuotePreview(); }
+
+  function renderItems(){
+    $("#itemsBody").innerHTML = state.quoteItems.map(function(it, i){
+      return '<tr data-i="'+i+'">' +
+        '<td><input type="text" class="it-name" value="'+esc(it.name)+'" placeholder="品目名"></td>' +
+        '<td class="num"><input type="number" min="0" step="1" class="it-qty" value="'+it.qty+'"></td>' +
+        '<td class="num"><input type="number" min="0" step="1" class="it-price" value="'+it.price+'"></td>' +
+        '<td class="num amt mono">'+fmtYen(it.qty*it.price)+'</td>' +
+        '<td><button class="btn btn-ghost btn-sm" data-act="del-item" data-i="'+i+'">✕</button></td>' +
+      '</tr>';
+    }).join("");
+    computeTotals();
+  }
+
+  function computeTotals(){
+    var subtotal = state.quoteItems.reduce(function(s,it){ return s + it.qty*it.price; }, 0);
+    var rate = Number($("#qTaxRate").value)||0;
+    var tax = Math.round(subtotal*rate);
+    var total = subtotal+tax;
+    $("#sumSubtotal").textContent = fmtYen(subtotal);
+    $("#sumTax").textContent = fmtYen(tax);
+    $("#sumTotal").textContent = fmtYen(total);
+    return {subtotal:subtotal, tax:tax, total:total};
+  }
+
+  function autoFillKsCancelFee(){
+    var maker = $("#qMaker").value.trim();
+    if(!maker) return;
+    var hit = state.ksFees.find(function(k){ return (k.maker||"").trim() === maker; });
+    if(hit && hit.fee) $("#qCancelFee").value = hit.fee;
+  }
+
+  function renderQuotePreview(){
+    var t = computeTotals();
+    var isFree = $("#qCharge").value === "free";
+    $("#pvTitle").textContent = isFree ? "修 理 案 内" : "御 見 積 書";
+    $("#pvAmountBox").hidden = isFree;
+    $("#pvItemsTable").hidden = isFree;
+    $("#pvTotalsBox").hidden = isFree;
+    $("#pvCheckPaid").hidden = isFree;
+    $("#pvCheckFree").hidden = !isFree;
+
+    var isKs = !!(state.quoteStore && state.quoteStore.company === "㈱ケーズHD");
+    var cancelFee = $("#qCancelFee").value.trim();
+    var showCancelNote = isKs && !isFree && !!cancelFee;
+    $("#pvCancelNote").hidden = !showCancelNote;
+    if(showCancelNote){
+      var feeNum = Number(cancelFee);
+      $("#pvCancelFeeAmt").textContent = (cancelFee && !isNaN(feeNum) && cancelFee !== "") ? fmtYen(feeNum) : cancelFee;
+    }
+
+    $("#pvDate").textContent = fmtDate($("#qDate").value);
+    $("#pvNo").textContent = $("#qNo").value;
+    $("#pvCustomer").textContent = ($("#qCustomer").value.trim() || "お客様名未入力");
+
+    var infoFields = [
+      ["pvMakerRow","pvMaker","qMaker"],
+      ["pvModelRow","pvModel","qModel"],
+      ["pvIssueRow","pvIssue","qIssue"],
+      ["pvRepairRow","pvRepairContent","qRepairContent"],
+      ["pvPartRow","pvPartName","qPartName"]
+    ];
+    var anyInfo = false;
+    infoFields.forEach(function(f){
+      var v = $("#"+f[2]).value.trim();
+      $("#"+f[1]).textContent = v || "-";
+      $("#"+f[0]).hidden = !v;
+      if(v) anyInfo = true;
+    });
+    $("#pvInfo").hidden = !anyInfo;
+
+    var s = state.quoteStore;
+    $("#pvFrom").innerHTML = s ?
+      ("<b>"+esc(s.company)+" "+esc(s.name)+" 御中</b>" +
+       (s.zip?("〒"+esc(s.zip)+" "):"") + esc(s.address||"") + "<br>" +
+       (s.tel?("TEL "+esc(s.tel)+" "):"") + (s.fax?("FAX "+esc(s.fax)):"")) :
+      "発行元店舗未選択";
+    $("#pvItems").innerHTML = state.quoteItems.filter(function(it){return it.name || it.qty || it.price;}).map(function(it){
+      return "<tr><td>"+esc(it.name||"-")+"</td><td class='num'>"+it.qty+"</td><td class='num'>"+fmtYen(it.price)+"</td><td class='num'>"+fmtYen(it.qty*it.price)+"</td></tr>";
+    }).join("") || "<tr><td colspan='4' style='color:#999;'>明細未入力</td></tr>";
+    $("#pvSubtotal").textContent = fmtYen(t.subtotal);
+    $("#pvTax").textContent = fmtYen(t.tax);
+    $("#pvTotal").textContent = fmtYen(t.total);
+    $("#pvGrand").textContent = fmtYen(t.total);
+  }
+
+  function renderQuoteHistory(){
+    var box = $("#quoteHistList");
+    if(!state.quotes.length){ box.innerHTML = '<div style="color:var(--ink-soft);font-size:13px;padding:8px 0;">保存した見積書はまだありません</div>'; return; }
+    box.innerHTML = state.quotes.map(function(q){
+      var total = (q.items||[]).reduce(function(s,it){return s+it.qty*it.price;},0);
+      var rate = q.taxRate||0.1;
+      total = Math.round(total*(1+rate));
+      return '<div class="hist-item"><div><div class="who">'+esc(q.customerName||"（宛先未入力）")+'</div>' +
+        '<div class="meta">'+esc(fmtDate(q.issueDate))+' ・ '+esc(q.quoteNo||"")+' ・ '+esc(q.storeName||"")+'</div></div>' +
+        '<div style="display:flex;align-items:center;gap:10px;"><b class="mono">'+fmtYen(total)+'</b>' +
+        '<button class="btn btn-sm" data-act="open-quote" data-id="'+q.id+'">開く</button></div></div>';
+    }).join("");
+  }
+
+  function loadQuoteIntoForm(id){
+    var q = state.quotes.find(function(x){ return x.id===id; });
+    if(!q) return;
+    $("#qDate").value = q.issueDate || todayISO();
+    $("#qNo").value = q.quoteNo || genQuoteNo();
+    $("#qCustomer").value = q.customerName || "";
+    $("#qCharge").value = q.chargeType || "paid";
+    $("#qMaker").value = q.maker || "";
+    $("#qModel").value = q.model || "";
+    $("#qIssue").value = q.issue || "";
+    $("#qRepairContent").value = q.repairContent || "";
+    $("#qPartName").value = q.partName || "";
+    $("#qCancelFee").value = q.cancelFee || "";
+    $("#qTaxRate").value = String(q.taxRate!=null?q.taxRate:0.1);
+    state.quoteItems = (q.items && q.items.length) ? q.items.map(function(it){ return newItemRow(it.name, it.qty, it.price); }) : [newItemRow()];
+    if(q.storeCode){
+      $("#qStorePicker")._set({code:q.storeCode, company:q.storeCompany, name:q.storeName, zip:q.storeZip, address:q.storeAddress, tel:q.storeTel, fax:q.storeFax});
+    } else {
+      $("#qStorePicker")._set(null);
+    }
+    renderItems();
+    renderQuotePreview();
+    switchView("quotes");
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  async function saveQuote(){
+    if(!db){ toast("データ機能を利用できません"); return; }
+    var s = state.quoteStore;
+    var data = {
+      quoteNo: $("#qNo").value,
+      issueDate: $("#qDate").value,
+      customerName: $("#qCustomer").value.trim(),
+      chargeType: $("#qCharge").value,
+      maker: $("#qMaker").value.trim(),
+      model: $("#qModel").value.trim(),
+      issue: $("#qIssue").value.trim(),
+      repairContent: $("#qRepairContent").value.trim(),
+      partName: $("#qPartName").value.trim(),
+      cancelFee: $("#qCancelFee").value.trim(),
+      storeCode: s?s.code:"", storeCompany: s?s.company:"", storeName: s?s.name:"",
+      storeZip: s?s.zip:"", storeAddress: s?s.address:"", storeTel: s?s.tel:"", storeFax: s?s.fax:"",
+      items: state.quoteItems.filter(function(it){return it.name||it.qty||it.price;}),
+      taxRate: Number($("#qTaxRate").value)||0
+    };
+    try{
+      await db.collection("quotes").add(data);
+      toast("見積書を保存しました");
+    }catch(err){ handleWriteError(err); }
+  }
+
+  async function downloadQuotePdf(){
+    if(!window.html2canvas || !window.jspdf){ toast("PDF機能の読み込みに失敗しました"); return; }
+    toast("PDFを作成しています…");
+    try{
+      var node = $("#quotePreview");
+      var canvas = await window.html2canvas(node, {scale:2, backgroundColor:"#ffffff"});
+      var imgData = canvas.toDataURL("image/png");
+      var jsPDF = window.jspdf.jsPDF;
+      var pdf = new jsPDF({unit:"mm", format:"a4", orientation:"portrait"});
+      var pageW = 210, pageH = 297, margin = 10;
+      var maxW = pageW - margin*2, maxH = pageH - margin*2;
+      var ratio = canvas.width / canvas.height;
+      var imgW = maxW, imgH = imgW / ratio;
+      if(imgH > maxH){ imgH = maxH; imgW = imgH * ratio; }
+      var x = margin + (maxW - imgW)/2;
+      var y = margin;
+      pdf.addImage(imgData, "PNG", x, y, imgW, imgH);
+      var blob = pdf.output("blob");
+      var fname = "見積書_" + ($("#qNo").value||"draft") + ".pdf";
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+      toast("PDFを保存しました");
+    }catch(err){
+      console.error(err); toast("PDFの作成に失敗しました");
+    }
+  }
+
+  function quoteFromRepair(id){
+    var r = state.repairs.find(function(x){ return x.id===id; });
+    if(!r) return;
+    resetQuoteForm();
+    $("#qNo").value = r.managementNo || genQuoteNo();
+    $("#qCustomer").value = r.customerName ? (r.customerName+" 様") : "";
+    $("#qCharge").value = r.chargeType || "paid";
+    $("#qMaker").value = r.maker || "";
+    $("#qModel").value = r.model || "";
+    $("#qIssue").value = r.issue || "";
+    if(r.storeCode){
+      $("#qStorePicker")._set({code:r.storeCode, company:r.storeCompany, name:r.storeName, zip:r.storeZip, address:r.storeAddress, tel:r.storeTel, fax:r.storeFax});
+    }
+    autoFillKsCancelFee();
+    state.quoteItems = [ newItemRow("修理費用", 1, r.estimateAmount||0) ];
+    renderItems();
+    renderQuotePreview();
+    switchView("quotes");
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  /* ---------------- wire up events ---------------- */
+  function wireEvents(){
+    $all("nav.tabs button").forEach(function(b){
+      b.addEventListener("click", function(){ switchView(b.dataset.view); });
+    });
+
+    $("#searchInput").addEventListener("input", function(e){ state.searchText = e.target.value; renderRepairs(); });
+    $("#statusFilter").addEventListener("click", function(e){
+      var c = e.target.closest(".chip");
+      if(!c) return;
+      $all("#statusFilter .chip").forEach(function(x){ x.classList.remove("active"); });
+      c.classList.add("active");
+      state.filterStatus = c.dataset.status;
+      renderRepairs();
+    });
+
+    $("#fChargeType").addEventListener("change", function(){
+      renderStatusOptions($("#fChargeType").value, $("#fStatus").value);
+    });
+    $("#fStatus").addEventListener("change", function(){
+      $("#fRemarks").value = appendRemark($("#fRemarks").value, $("#fStatus").value);
+    });
+
+    $("#btnNewRepair").addEventListener("click", function(){ openRepairSheet(null); });
+    $("#btnCloseSheet").addEventListener("click", closeRepairSheet);
+    $("#btnCancelRepair").addEventListener("click", closeRepairSheet);
+    $("#btnSaveRepair").addEventListener("click", saveRepairFromForm);
+    $("#btnDeleteRepair").addEventListener("click", function(){
+      var id = state.editingId;
+      showConfirm("この修理受付を削除します。よろしいですか？", function(){ deleteRepairConfirmed(id); });
+    });
+    $("#repairOverlay").addEventListener("click", function(e){ if(e.target.id==="repairOverlay") closeRepairSheet(); });
+
+    $("#repairBody").addEventListener("click", function(e){
+      var btn = e.target.closest("button[data-act]");
+      if(btn){
+        var id = btn.dataset.id;
+        if(btn.dataset.act === "edit") openRepairSheet(id);
+        if(btn.dataset.act === "quote") quoteFromRepair(id);
+        if(btn.dataset.act === "delete"){
+          showConfirm("この修理受付を削除します。よろしいですか？", function(){ deleteRepairConfirmed(id); });
+        }
+        return;
+      }
+      if(e.target.closest("select")) return;
+      var tr = e.target.closest("tr[data-id]");
+      if(tr) openRepairSheet(tr.dataset.id);
+    });
+
+    $("#destSearchInput").addEventListener("input", function(e){ state.destSearchText = e.target.value; renderDestinations(); });
+    $("#btnNewDest").addEventListener("click", function(){ openDestinationSheet(null); });
+    $("#btnCloseDestSheet").addEventListener("click", closeDestinationSheet);
+    $("#btnCancelDest").addEventListener("click", closeDestinationSheet);
+    $("#btnSaveDest").addEventListener("click", saveDestinationFromForm);
+    $("#btnDeleteDest").addEventListener("click", function(){
+      var id = state.editingDestId;
+      showConfirm("この修理先を削除します。よろしいですか？", function(){ deleteDestinationConfirmed(id); });
+    });
+    $("#destOverlay").addEventListener("click", function(e){ if(e.target.id==="destOverlay") closeDestinationSheet(); });
+    $("#destBody").addEventListener("click", function(e){
+      var btn = e.target.closest("button[data-act]");
+      if(!btn) return;
+      var id = btn.dataset.id;
+      if(btn.dataset.act === "edit-dest") openDestinationSheet(id);
+      if(btn.dataset.act === "delete-dest"){
+        showConfirm("この修理先を削除します。よろしいですか？", function(){ deleteDestinationConfirmed(id); });
+      }
+    });
+
+    $("#ksSearchInput").addEventListener("input", function(e){ state.ksSearchText = e.target.value; renderKsFees(); });
+    $("#btnNewKs").addEventListener("click", function(){ openKsSheet(null); });
+    $("#btnCloseKsSheet").addEventListener("click", closeKsSheet);
+    $("#btnCancelKs").addEventListener("click", closeKsSheet);
+    $("#btnSaveKs").addEventListener("click", saveKsFromForm);
+    $("#btnDeleteKs").addEventListener("click", function(){
+      var id = state.editingKsId;
+      showConfirm("このキャンセル料マスタを削除します。よろしいですか？", function(){ deleteKsConfirmed(id); });
+    });
+    $("#ksOverlay").addEventListener("click", function(e){ if(e.target.id==="ksOverlay") closeKsSheet(); });
+    $("#ksBody").addEventListener("click", function(e){
+      var btn = e.target.closest("button[data-act]");
+      if(!btn) return;
+      var id = btn.dataset.id;
+      if(btn.dataset.act === "edit-ks") openKsSheet(id);
+      if(btn.dataset.act === "delete-ks"){
+        showConfirm("このキャンセル料マスタを削除します。よろしいですか？", function(){ deleteKsConfirmed(id); });
+      }
+    });
+
+    $("#repairBody").addEventListener("change", function(e){
+      if(e.target.classList.contains("status-select")){
+        var id = e.target.dataset.id;
+        if(!db) return;
+        var rec = state.repairs.find(function(x){ return x.id===id; });
+        var newRemarks = appendRemark(rec ? rec.remarks : "", e.target.value);
+        db.collection("repairs").doc(id).update({status:e.target.value, remarks:newRemarks, updatedAt:new Date().toISOString()})
+          .then(function(){ toast("ステータスを更新しました"); })
+          .catch(handleWriteError);
+      }
+    });
+
+    $("#btnAddItem").addEventListener("click", function(){ state.quoteItems.push(newItemRow()); renderItems(); renderQuotePreview(); });
+    $("#itemsBody").addEventListener("click", function(e){
+      var btn = e.target.closest("button[data-act='del-item']");
+      if(!btn) return;
+      state.quoteItems.splice(Number(btn.dataset.i),1);
+      if(!state.quoteItems.length) state.quoteItems.push(newItemRow());
+      renderItems(); renderQuotePreview();
+    });
+    $("#itemsBody").addEventListener("input", function(e){
+      var tr = e.target.closest("tr"); if(!tr) return;
+      var i = Number(tr.dataset.i); var it = state.quoteItems[i]; if(!it) return;
+      if(e.target.classList.contains("it-name")) it.name = e.target.value;
+      if(e.target.classList.contains("it-qty")) it.qty = Number(e.target.value)||0;
+      if(e.target.classList.contains("it-price")) it.price = Number(e.target.value)||0;
+      var amtCell = tr.querySelector(".amt");
+      if(amtCell) amtCell.textContent = fmtYen(it.qty*it.price);
+      computeTotals(); renderQuotePreview();
+    });
+
+    ["qDate","qNo","qCustomer","qCharge","qTaxRate","qMaker","qModel","qIssue","qRepairContent","qPartName","qCancelFee"].forEach(function(id){
+      $("#"+id).addEventListener("input", renderQuotePreview);
+      $("#"+id).addEventListener("change", renderQuotePreview);
+    });
+    $("#qMaker").addEventListener("input", function(){ autoFillKsCancelFee(); renderQuotePreview(); });
+
+    $("#btnQuoteReset").addEventListener("click", function(){
+      showConfirm("入力内容をクリアします。よろしいですか？", resetQuoteForm);
+    });
+    $("#btnQuoteSave").addEventListener("click", saveQuote);
+    $("#btnQuotePdf").addEventListener("click", downloadQuotePdf);
+
+    $("#quoteHistList").addEventListener("click", function(e){
+      var btn = e.target.closest("button[data-act='open-quote']");
+      if(!btn) return;
+      loadQuoteIntoForm(btn.dataset.id);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", boot);
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+  var PW_KEY = "repairLedgerUnlocked_v1";
+  var PASSWORD = "fukuoka160";
+  var gate = document.getElementById("pwGate");
+  var input = document.getElementById("pwInput");
+  var err = document.getElementById("pwError");
+
+  if(sessionStorage.getItem(PW_KEY) === "1" || localStorage.getItem(PW_KEY) === "1"){
+    gate.style.display = "none";
+    return;
+  }
+
+  function tryUnlock(){
+    if(input.value === PASSWORD){
+      localStorage.setItem(PW_KEY, "1");
+      gate.style.display = "none";
+    } else {
+      err.style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  document.getElementById("pwSubmit").addEventListener("click", tryUnlock);
+  input.addEventListener("keydown", function(e){ if(e.key === "Enter") tryUnlock(); });
+  input.focus();
+})();
+</script>
+</body>
+</html>
