@@ -18,7 +18,7 @@ DEFAULTS: dict = {
         "margin_basis": "sale",
         "require_reliable_market": True,
         "shipping_table": {"compact": 450, "s60": 750, "s80": 850, "s100": 1050},
-        "default_size_class": "s100",
+        "default_size_class": "s80",
         "size_class_by_keyword": {},
     },
     "exclude": {

@@ -33,7 +33,7 @@ profit:
     s120: 1200
     s140: 1450
     s160: 1700
-  default_size_class: s100     # 未指定時は安全側(大きめ)
+  default_size_class: s80      # 未指定・キーワード不一致時の区分(安全側にしたい場合は s100)
   # タイトルにキーワードを含む場合の区分(上から順に判定)。ジャンル不問の汎用例。
   # 個別指定したい場合は CSV の size_class 列が最優先。該当なしは default_size_class。
   size_class_by_keyword:
