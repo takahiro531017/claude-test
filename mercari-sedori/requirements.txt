@@ -3,8 +3,8 @@ python-dotenv>=1.0
 requests>=2.31
 schedule>=1.2
 pytest>=8.0
-# ステップ3以降で使用
+# 出品支援・ダッシュボード・Playwright用
 playwright>=1.44
-# anthropic>=0.40
-# streamlit>=1.35
-# pandas>=2.0
+anthropic>=0.40
+streamlit>=1.35
+pandas>=2.0
