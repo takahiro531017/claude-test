@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>登山ゲーム - 3000mの頂を目指せ</title>
+<style>
+  html,body{margin:0;height:100%;background:#10151c;color:#eee;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden;touch-action:none}
+  #wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%}
+  canvas{background:#000;max-width:100vw;max-height:calc(100vh - 120px);aspect-ratio:480/720;height:auto;box-shadow:0 0 30px #000}
+  #pad{display:none;gap:8px;margin-top:6px;align-items:center}
+  #pad button{width:56px;height:56px;font-size:24px;border-radius:12px;border:0;background:#2b3745;color:#fff;touch-action:none;user-select:none}
+  #pad .sp{width:20px}
+  @media (pointer:coarse){#pad{display:flex}canvas{max-height:calc(100vh - 140px)}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="480" height="720"></canvas>
+  <div id="pad">
+    <button data-k="ArrowLeft">◀</button>
+    <button data-k="ArrowUp">▲</button>
+    <button data-k="ArrowDown">▼</button>
+    <button data-k="ArrowRight">▶</button>
+    <span class="sp"></span>
+    <button data-k=" ">🔔</button>
+  </div>
+</div>
+<script>
+(() => {
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const W = 480, H = 720, PY = H * 0.65;
+const GOAL = 3000, PXM = 4, GOAL_Y = GOAL * PXM;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const hash = n => { n = Math.sin(n * 127.1) * 43758.5453; return n - Math.floor(n); };
+
+// ---------- input ----------
+const keys = {};
+let bellPressed = false;
+addEventListener('keydown', e => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  if (!keys[e.key]) onPress(e.key);
+  keys[e.key] = true;
+});
+addEventListener('keyup', e => keys[e.key] = false);
+document.querySelectorAll('#pad button').forEach(b => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); if (!keys[k]) onPress(k); keys[k] = true; });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => b.addEventListener(ev, () => keys[k] = false));
+});
+cv.addEventListener('pointerdown', () => { if (state !== 'play') start(); });
+const down = (...ks) => ks.some(k => keys[k]);
+function onPress(k) {
+  initAudio();
+  if (state !== 'play') { if (k === ' ' || k === 'Enter') start(); return; }
+  if (k === ' ') ringBell();
+  if (k === 'm' || k === 'M') muted = !muted;
+  if (k === 'p' || k === 'P') paused = !paused;
+}
+
+// ---------- audio ----------
+let actx = null, muted = false;
+function initAudio() { if (!actx) try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+function tone(f, d, type = 'square', vol = 0.06, slide = 0) {
+  if (!actx || muted) return;
+  const o = actx.createOscillator(), gn = actx.createGain();
+  o.type = type; o.frequency.value = f;
+  if (slide) o.frequency.linearRampToValueAtTime(f + slide, actx.currentTime + d);
+  gn.gain.value = vol; gn.gain.linearRampToValueAtTime(0, actx.currentTime + d);
+  o.connect(gn); gn.connect(actx.destination); o.start(); o.stop(actx.currentTime + d);
+}
+const sfx = {
+  hit: () => tone(120, .25, 'sawtooth', .1, -60),
+  warn: () => { tone(660, .12); setTimeout(() => tone(660, .12), 180); },
+  item: () => { tone(660, .08, 'triangle'); setTimeout(() => tone(990, .12, 'triangle'), 80); },
+  bell: () => { tone(1320, .6, 'sine', .1); tone(1760, .5, 'sine', .05); },
+  slip: () => tone(500, .5, 'sawtooth', .07, -420),
+  win: () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, .25, 'triangle', .1), i * 150)),
+  lose: () => [300, 250, 200, 140].forEach((f, i) => setTimeout(() => tone(f, .3, 'sawtooth', .08), i * 200)),
+};
+
+// ---------- game state ----------
+let state = 'title', paused = false;
+let p, huts, items, rocks, rockWarns, animals, avalanche, wx, ev, msgs, parts, flakes, cam, shake, time, flash, cause, best = 0;
+
+function start() {
+  p = { x: W / 2, y: 0, stamina: 100, hp: 100, warmth: 100, bells: 2, exh: false, slip: 0, inv: 0, inHut: false, face: 1, hurt: 0 };
+  huts = []; items = []; rocks = []; rockWarns = []; animals = []; msgs = []; parts = [];
+  avalanche = null; cam = 0; shake = 0; time = 0; flash = 0; cause = '';
+  wx = { target: 'clear', rain: 0, snow: 0, timer: 10 };
+  ev = { rock: 3, aval: 22, animal: 14, nextHut: 450, nextItem: 120 };
+  flakes = Array.from({ length: 160 }, () => ({ x: rnd(0, W), y: rnd(0, H), s: rnd(.5, 1) }));
+  // starting hut
+  huts.push({ x: 80, y: 0 });
+  state = 'play'; paused = false;
+  say('3000m の頂を目指せ！ ↑で登る', '#fff');
+}
+function say(text, color = '#ffd54a', t = 3) { msgs.push({ text, color, t }); if (msgs.length > 3) msgs.shift(); }
+
+function damage(n, why) {
+  if (p.inv > 0 || state !== 'play') return;
+  p.hp -= n; p.inv = 0.6; p.hurt = 0.3; shake = 0.35; cause = why; sfx.hit();
+  for (let i = 0; i < 8; i++) parts.push({ x: p.x, y: p.y + 10, vx: rnd(-80, 80), vy: rnd(0, 120), t: .5, c: '#e33' });
+  if (p.hp <= 0) { p.hp = 0; state = 'over'; sfx.lose(); }
+}
+function slipDown(dist, why, dmg) {
+  if (p.slip > 0) return;
+  p.slip = Math.min(dist, p.y); sfx.slip();
+  if (dmg) damage(dmg, why); else cause = why;
+  say('滑落！', '#ff7043', 2);
+}
+function ringBell() {
+  if (p.bells <= 0) { say('ベルがない…', '#bbb', 1.5); return; }
+  p.bells--; sfx.bell(); parts.push({ ring: true, x: p.x, y: p.y, t: .6 });
+  let scared = 0;
+  animals.forEach(a => { if (Math.hypot(a.x - p.x, a.y - p.y) < 280) { a.state = 'flee'; scared++; } });
+  say(scared ? '🔔 動物が逃げていく！' : '🔔 ベルを鳴らした', '#9fd3ff', 2);
+}
+
+// ---------- update ----------
+const alt = () => p.y / PXM;
+function chooseWeather() {
+  const a = alt(), r = Math.random();
+  let t = 'clear';
+  if (a < 900) t = r < .35 ? 'rain' : 'clear';
+  else if (a < 2000) t = r < .25 ? 'rain' : r < .6 ? 'snow' : 'clear';
+  else t = r < .55 ? 'snow' : 'clear';
+  if (t !== wx.target) {
+    wx.target = t;
+    if (t === 'rain') say('☔ 大雨だ！足元が滑る', '#7ec8ff');
+    if (t === 'snow') say('❄ 大雪！視界不良・体温低下', '#dff');
+    if (t === 'clear') say('☀ 天候が回復してきた', '#ffe08a');
+  }
+  wx.timer = rnd(16, 30);
+}
+
+function update(dt) {
+  time += dt;
+  const a = alt();
+  p.inv = Math.max(0, p.inv - dt); p.hurt = Math.max(0, p.hurt - dt); shake = Math.max(0, shake - dt); flash = Math.max(0, flash - dt);
+
+  // hut?
+  p.inHut = huts.some(h => Math.abs(p.x - h.x) < 46 && p.y >= h.y - 4 && p.y <= h.y + 58);
+
+  // weather
+  wx.timer -= dt; if (wx.timer <= 0) chooseWeather();
+  wx.rain = lerp(wx.rain, wx.target === 'rain' ? 1 : 0, dt * .5);
+  wx.snow = lerp(wx.snow, wx.target === 'snow' ? 1 : 0, dt * .5);
+  const rainI = wx.rain, snowI = wx.snow;
+  const exposed = !p.inHut;
+  if (rainI > .5 && Math.random() < dt * .08) flash = .15;
+
+  // movement
+  const L = down('ArrowLeft', 'a', 'A'), R = down('ArrowRight', 'd', 'D');
+  const U = down('ArrowUp', 'w', 'W'), D = down('ArrowDown', 's', 'S');
+  const vx = (R ? 1 : 0) - (L ? 1 : 0);
+  if (vx) p.face = vx;
+  const spd = 1 - (exposed ? .15 * rainI + .25 * snowI : 0);
+  if (p.slip > 0) {
+    const d = Math.min(520 * dt, p.slip); p.y -= d; p.slip -= d;
+    if (p.y < 0) { p.y = 0; p.slip = 0; }
+  } else {
+    if (U && !p.exh) {
+      p.y += 70 * spd * dt; p.stamina -= (8 + a / 600) * dt;
+      // slippery weather
+      const slipP = exposed ? .09 * rainI + .06 * snowI : 0;
+      if (Math.random() < slipP * dt) slipDown(rnd(110, 260), '雨雪で足を滑らせて滑落', 8);
+    }
+    if (D) { p.y = Math.max(0, p.y - 90 * dt); }
+    if (vx) { p.x += vx * 90 * spd * dt; if (!p.inHut) p.stamina -= 2 * dt; }
+    p.x = clamp(p.x, 22, W - 22);
+    if (!(U && !p.exh)) {
+      let rec = (vx || D) ? 4 : 13;
+      if (exposed) rec *= 1 - .4 * rainI - .3 * snowI;
+      if (p.inHut) rec = 32;
+      p.stamina += rec * dt;
+    }
+  }
+  if (p.stamina <= 0 && !p.exh) { p.stamina = 0; p.exh = true; say('力尽きた！', '#ff7043', 2.5); slipDown(rnd(120, 220), '体力が尽きて滑落', 6); }
+  if (p.exh && p.stamina > 30) p.exh = false;
+  p.stamina = clamp(p.stamina, 0, 100);
+
+  // warmth
+  let wr = 0;
+  if (exposed) wr -= 5.5 * snowI + 2.5 * rainI + (a > 2000 ? 1 : 0);
+  if (rainI < .3 && snowI < .3 && a < 2000) wr += 1.2;
+  if (p.inHut) wr = 22;
+  p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+  if (p.warmth <= 0) {
+    p.hp -= 4 * dt; cause = '低体温症で力尽きた';
+    if (p.hp <= 0) { p.hp = 0; state = 'over'; sfx.lose(); }
+  }
+  if (p.warmth < 25 && Math.random() < dt * .4) p.stamina = Math.max(0, p.stamina - 1.5);
+
+  // hut spawn / items spawn
+  const topY = p.y + PY + 120;
+  while (ev.nextHut < topY && ev.nextHut < GOAL_Y - 120) {
+    huts.push({ x: rnd(70, W - 70), y: ev.nextHut }); ev.nextHut += rnd(520, 820);
+  }
+  while (ev.nextItem < topY) {
+    const r = Math.random();
+    const t = r < .35 ? 'food' : r < .55 ? 'bell' : r < .75 ? 'med' : 'tea';
+    items.push({ t, x: rnd(30, W - 30), y: ev.nextItem }); ev.nextItem += rnd(110, 230);
+  }
+  items = items.filter(i => {
+    if (Math.hypot(i.x - p.x, i.y + 8 - p.y) < 24) {
+      sfx.item();
+      if (i.t === 'food') { p.stamina = Math.min(100, p.stamina + 45); say('🍙 スタミナ回復', '#aef'); }
+      if (i.t === 'bell') { p.bells = Math.min(5, p.bells + 1); say('🔔 ベルを入手', '#aef'); }
+      if (i.t === 'med') { p.hp = Math.min(100, p.hp + 30); say('🩹 体力回復', '#aef'); }
+      if (i.t === 'tea') { p.warmth = Math.min(100, p.warmth + 45); say('☕ 体が温まった', '#aef'); }
+      return false;
+    }
+    return i.y > p.y - H;
+  });
+  huts = huts.filter(h => h.y > p.y - H - 200);
+
+  // ---- rockfall ----
+  const rockRate = Math.max(.55, 2.8 - a / 1300) * (1 - .3 * rainI);
+  ev.rock -= dt;
+  if (ev.rock <= 0 && a > 40) {
+    ev.rock = rnd(rockRate * .6, rockRate * 1.4);
+    const rx = Math.random() < .5 ? clamp(p.x + rnd(-70, 70), 20, W - 20) : rnd(20, W - 20);
+    rockWarns.push({ x: rx, t: .9, r: rnd(8, 17) });
+  }
+  rockWarns = rockWarns.filter(w => {
+    w.t -= dt;
+    if (w.t <= 0) { rocks.push({ x: w.x, y: p.y + PY + 20, vy: rnd(260, 420), r: w.r }); return false; }
+    return true;
+  });
+  const botY = p.y - (H - PY) - 40;
+  rocks = rocks.filter(r => {
+    r.y -= r.vy * dt;
+    const h = huts.find(h => Math.abs(r.x - h.x) < 52 && r.y < h.y + 66 && r.y > h.y - 4);
+    if (h) { for (let i = 0; i < 5; i++) parts.push({ x: r.x, y: r.y, vx: rnd(-60, 60), vy: rnd(20, 90), t: .4, c: '#998' }); return false; }
+    if (!p.inHut && Math.hypot(r.x - p.x, r.y - (p.y + 12)) < r.r + 9) { damage(Math.round(8 + r.r), '落石に直撃された'); return false; }
+    return r.y > botY;
+  });
+
+  // ---- avalanche ----
+  ev.aval -= dt;
+  if (!avalanche && ev.aval <= 0 && a > 300) {
+    const left = Math.random() < .5;
+    avalanche = { x0: left ? 0 : 170, x1: left ? 310 : W, t: 0, hit: false };
+    say('⚠ 雪崩が来る！赤いゾーンから離れろ！', '#ff5252', 3.2); sfx.warn();
+  }
+  if (avalanche) {
+    avalanche.t += dt;
+    if (!avalanche.hit && avalanche.t > 3.9) {
+      avalanche.hit = true;
+      if (!p.inHut && p.x > avalanche.x0 && p.x < avalanche.x1) { damage(45, '雪崩に飲まれた'); p.inv = 0; slipDown(300, '雪崩に飲まれた', 0); shake = .8; }
+    }
+    if (avalanche.t > 4.8) { avalanche = null; ev.aval = rnd(26, 42) - Math.min(10, a / 400); }
+  }
+
+  // ---- animals ----
+  ev.animal -= dt;
+  if (ev.animal <= 0 && animals.length < 2 && a > 100) {
+    ev.animal = rnd(18, 30);
+    const type = Math.random() < .5 ? 'bear' : 'lion';
+    const fromLeft = Math.random() < .5;
+    animals.push({ type, x: fromLeft ? -20 : W + 20, y: p.y + rnd(-60, 160), state: 'chase', life: 24, cd: 1 });
+    say(type === 'bear' ? '⚠ クマが出没！' : '⚠ ライオンが出没！ベルで追い払え(Space)', '#ff7043', 3.5); sfx.warn();
+  }
+  animals = animals.filter(an => {
+    an.life -= dt; an.cd -= dt;
+    const dx = p.x - an.x, dy = p.y - an.y, d = Math.hypot(dx, dy) || 1;
+    const sp = an.type === 'bear' ? 58 : 118;
+    if (an.state === 'flee' || p.inHut || an.life <= 0) {
+      const away = an.x < W / 2 ? -1 : 1;
+      an.x += away * sp * 1.2 * dt; if (p.inHut && an.state !== 'flee') an.life -= dt * 2;
+      return an.x > -50 && an.x < W + 50;
+    }
+    if (d > 20) { an.x += dx / d * sp * dt; an.y += dy / d * sp * dt; }
+    else if (an.cd <= 0) {
+      an.cd = 1.3;
+      damage(an.type === 'bear' ? 22 : 16, an.type === 'bear' ? 'クマに襲われた' : 'ライオンに襲われた');
+      an.x -= dx / d * 40; an.y -= dy / d * 40; // recoil
+    }
+    return true;
+  });
+
+  // camera / particles
+  cam = lerp(cam, p.y, Math.min(1, dt * 6));
+  parts = parts.filter(q => { q.t -= dt; if (!q.ring) { q.x += q.vx * dt; q.y += q.vy * dt; q.vy -= 200 * dt; } return q.t > 0; });
+  msgs.forEach(m => m.t -= dt); msgs = msgs.filter(m => m.t > 0);
+  flakes.forEach(f => {
+    const fall = (rainI > snowI ? 520 : 70) * f.s;
+    f.y += fall * dt; f.x += (rainI > snowI ? -60 : Math.sin(time + f.s * 9) * 25) * dt;
+    if (f.y > H) { f.y = -5; f.x = rnd(0, W); }
+    if (f.x < 0) f.x += W;
+  });
+
+  if (state === 'play' && p.y >= GOAL_Y) { state = 'win'; best = Math.max(best, Math.round(p.hp)); sfx.win(); }
+}
+
+// ---------- render ----------
+const sy = y => PY - (y - cam);
+function skyColors() {
+  const a = clamp(cam / GOAL_Y, 0, 1);
+  const dark = clamp(wx.rain * .55 + wx.snow * .45, 0, .7);
+  const top = [lerp(90, 20, a), lerp(150, 40, a), lerp(220, 100, a)].map(v => v * (1 - dark * .6));
+  const bot = [lerp(190, 120, a), lerp(220, 150, a), lerp(250, 200, a)].map(v => v * (1 - dark * .45) + (wx.snow * 40));
+  return [top, bot].map(c => `rgb(${c.map(v => clamp(v | 0, 0, 255)).join(',')})`);
+}
+
+function drawMountain() {
+  const [t, b] = skyColors();
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, t); gr.addColorStop(1, b);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  // distant peaks (parallax)
+  g.fillStyle = 'rgba(70,80,110,.35)';
+  g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= W; x += 40) g.lineTo(x, H * .55 + (cam * .06 % 400) * 0 + 60 * Math.sin(x * .013 + 1) + 40 * hash(x) - cam * .02);
+  g.lineTo(W, H); g.fill();
+
+  // rock face
+  const yTop = cam + PY + 10, yBot = cam - (H - PY) - 10;
+  const snowy = clamp((cam / PXM - 1200) / 1200, 0, 1);
+  g.fillStyle = `rgb(${lerp(98, 150, snowy) | 0},${lerp(88, 150, snowy) | 0},${lerp(80, 160, snowy) | 0})`;
+  g.fillRect(0, 0, W, H);
+  if (yBot < 0) { // ground
+    g.fillStyle = '#4c7a3a'; g.fillRect(0, sy(0) + 14, W, H);
+    g.fillStyle = '#3b5f2d'; for (let x = 0; x < W; x += 24) g.fillRect(x, sy(0) + 14, 12, 4);
+  }
+  const step = 36;
+  for (let c = Math.floor(yBot / step); c <= Math.ceil(yTop / step); c++) {
+    for (let k = 0; k < 4; k++) {
+      const s = c * 7 + k, x = hash(s) * W, y = c * step + hash(s + .5) * step;
+      if (y < 0) continue;
+      const len = 8 + hash(s + 2) * 26, dir = hash(s + 3) > .5 ? 1 : -1;
+      g.strokeStyle = 'rgba(40,35,30,.35)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(x, sy(y)); g.lineTo(x + dir * len * .5, sy(y) - len * .4); g.lineTo(x + dir * len, sy(y) - len * .2); g.stroke();
+      if (hash(s + 4) < snowy * .8) { g.fillStyle = 'rgba(255,255,255,.75)'; g.fillRect(x - 4, sy(y) + 2, 10 + hash(s + 5) * 14, 3); }
+    }
+    // altitude ticks
+    const my = c * step;
+    if (my > 0 && (my / PXM) % 100 < step / PXM && my > 0) {
+      const m = Math.round(my / PXM / 100) * 100;
+      if (Math.abs(my - m * PXM) < step) {
+        g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '11px sans-serif'; g.textAlign = 'left';
+        g.fillText(m + 'm', 4, sy(m * PXM) - 2); g.fillRect(0, sy(m * PXM), 24, 1);
+      }
+    }
+  }
+  // side walls
+  g.fillStyle = '#3a342f';
+  g.beginPath(); g.moveTo(0, 0);
+  for (let y = 0; y <= H; y += 20) g.lineTo(8 + hash(Math.floor((cam - y) / 20)) * 14, y);
+  g.lineTo(0, H); g.fill();
+  g.beginPath(); g.moveTo(W, 0);
+  for (let y = 0; y <= H; y += 20) g.lineTo(W - 8 - hash(Math.floor((cam - y) / 20) + 99) * 14, y);
+  g.lineTo(W, H); g.fill();
+
+  // summit
+  const s = sy(GOAL_Y);
+  if (s > -60) {
+    g.fillStyle = '#e8eef5'; g.fillRect(0, s, W, H);
+    g.fillStyle = '#fff'; g.fillRect(W / 2 - 2, s - 50, 3, 50);
+    g.fillStyle = '#e53935'; g.beginPath(); g.moveTo(W / 2 + 1, s - 50); g.lineTo(W / 2 + 34, s - 40); g.lineTo(W / 2 + 1, s - 30); g.fill();
+    g.fillStyle = '#333'; g.font = 'bold 14px sans-serif'; g.textAlign = 'center'; g.fillText('SUMMIT 3000m', W / 2, s + 24);
+  }
+}
+
+function drawHut(h) {
+  const x = h.x, y = sy(h.y), w = 92, hh = 58;
+  g.fillStyle = '#3b2a1d'; g.fillRect(x - w / 2, y - hh, w, hh);
+  const gl = g.createRadialGradient(x, y - 14, 4, x, y - 14, 44); gl.addColorStop(0, 'rgba(255,170,60,.7)'); gl.addColorStop(1, 'rgba(255,170,60,0)');
+  g.fillStyle = gl; g.fillRect(x - w / 2, y - hh, w, hh);
+  // fire
+  g.fillStyle = '#ff8a00'; g.beginPath(); g.moveTo(x - 8, y - 2); g.quadraticCurveTo(x, y - 26 - Math.sin(time * 14) * 3, x + 8, y - 2); g.fill();
+  g.fillStyle = '#ffd54a'; g.beginPath(); g.moveTo(x - 4, y - 2); g.quadraticCurveTo(x, y - 14, x + 4, y - 2); g.fill();
+  // roof
+  g.fillStyle = '#7a3b2a'; g.beginPath(); g.moveTo(x - w / 2 - 8, y - hh); g.lineTo(x, y - hh - 24); g.lineTo(x + w / 2 + 8, y - hh); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x - w / 2 - 8, y - hh); g.lineTo(x - w / 4, y - hh - 12); g.lineTo(x + w / 4, y - hh - 12); g.lineTo(x + w / 2 + 8, y - hh); g.lineTo(x + w / 2 - 6, y - hh - 4); g.lineTo(x - w / 2 + 6, y - hh - 4); g.fill();
+  g.fillStyle = '#fff'; g.font = '11px sans-serif'; g.textAlign = 'center'; g.fillText('山小屋', x, y + 12);
+}
+
+function emoji(ch, x, y, size) { g.font = size + 'px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, x, y); g.textBaseline = 'alphabetic'; }
+
+function drawPlayer() {
+  const x = p.x, y = sy(p.y);
+  if (p.inv > 0 && Math.floor(time * 20) % 2) return;
+  g.save(); g.translate(x, y);
+  if (p.slip > 0) g.rotate(Math.sin(time * 30) * .3);
+  g.fillStyle = '#263238'; g.fillRect(-6, -8, 5, 9); g.fillRect(1, -8, 5, 9); // legs
+  g.fillStyle = p.hurt > 0 ? '#fff' : '#e53935'; g.fillRect(-8, -24, 16, 17); // jacket
+  g.fillStyle = '#6d4c41'; g.fillRect(-11 * p.face - 4, -22, 8, 14); // backpack
+  g.fillStyle = '#ffcc99'; g.beginPath(); g.arc(0, -30, 6, 0, 7); g.fill();
+  g.fillStyle = '#1565c0'; g.fillRect(-7, -37, 14, 5); // helmet
+  const sw = Math.sin(time * 12) * 3 * (down('ArrowUp', 'w', 'W') ? 1 : 0);
+  g.strokeStyle = '#e53935'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(-8, -20); g.lineTo(-12, -32 + sw); g.moveTo(8, -20); g.lineTo(12, -32 - sw); g.stroke();
+  g.restore();
+}
+
+function drawWorld() {
+  huts.forEach(drawHut);
+  items.forEach(i => emoji({ food: '🍙', bell: '🔔', med: '🩹', tea: '☕' }[i.t], i.x, sy(i.y) - 8, 22));
+  // avalanche zone
+  if (avalanche) {
+    const a = avalanche, w = a.x1 - a.x0;
+    if (a.t < 3.9) {
+      g.fillStyle = `rgba(255,40,40,${.12 + .12 * Math.abs(Math.sin(a.t * 6))})`; g.fillRect(a.x0, 0, w, H);
+      g.fillStyle = '#ff5252'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.fillText('⚠ 雪崩ゾーン ⚠', a.x0 + w / 2, H * .3);
+    } else {
+      const k = clamp((a.t - 3.9) / 0.9, 0, 1), yy = lerp(-60, H + 60, k);
+      g.fillStyle = 'rgba(255,255,255,.92)'; g.fillRect(a.x0, yy - 300, w, 300);
+      g.fillStyle = 'rgba(220,235,255,.8)'; for (let i = 0; i < 18; i++) g.fillRect(a.x0 + hash(i) * w, yy - 300 + hash(i + 7) * 300, 30, 14);
+    }
+  }
+  rockWarns.forEach(w => { g.fillStyle = '#ffeb3b'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; if (Math.floor(w.t * 14) % 2) g.fillText('▼', w.x, 22); });
+  rocks.forEach(r => {
+    const y = sy(r.y);
+    g.fillStyle = '#5d5148'; g.beginPath(); g.arc(r.x, y, r.r, 0, 7); g.fill();
+    g.fillStyle = '#8a7c70'; g.beginPath(); g.arc(r.x - r.r * .3, y - r.r * .3, r.r * .45, 0, 7); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(r.x - 2, y - r.r * 4, 4, r.r * 3);
+  });
+  animals.forEach(an => {
+    const y = sy(an.y);
+    g.save(); g.translate(an.x, y); if (p.x < an.x) g.scale(1, 1);
+    emoji(an.type === 'bear' ? '🐻' : '🦁', 0, -14, an.type === 'bear' ? 38 : 34);
+    if (an.state === 'flee') { g.fillStyle = '#9fd3ff'; g.font = '14px sans-serif'; g.fillText('💦', 0, -42); }
+    g.restore();
+  });
+  drawPlayer();
+  parts.forEach(q => {
+    if (q.ring) { g.strokeStyle = `rgba(159,211,255,${q.t / .6})`; g.lineWidth = 3; g.beginPath(); g.arc(q.x, sy(q.y) - 14, (1 - q.t / .6) * 280, 0, 7); g.stroke(); }
+    else { g.fillStyle = q.c; g.fillRect(q.x, sy(q.y), 3, 3); }
+  });
+}
+
+function drawWeather() {
+  const rI = wx.rain, sI = wx.snow;
+  if (rI > .02) {
+    g.fillStyle = `rgba(15,25,45,${.38 * rI})`; g.fillRect(0, 0, W, H);
+    g.strokeStyle = `rgba(190,215,255,${.55 * rI})`; g.lineWidth = 1; g.beginPath();
+    flakes.forEach((f, i) => { if (i % 2 || i < 160 * rI * 1) { g.moveTo(f.x, f.y); g.lineTo(f.x + 5, f.y - 14); } });
+    g.stroke();
+  }
+  if (sI > .02) {
+    g.fillStyle = `rgba(235,242,255,${.2 * sI})`; g.fillRect(0, 0, W, H);
+    g.fillStyle = `rgba(255,255,255,${.9 * sI})`;
+    flakes.forEach(f => { g.beginPath(); g.arc(f.x, f.y, 1 + f.s * 2, 0, 7); g.fill(); });
+    const px = p.x, py = sy(p.y) - 20;
+    const vg = g.createRadialGradient(px, py, 70, px, py, 280);
+    vg.addColorStop(0, 'rgba(235,242,255,0)'); vg.addColorStop(1, `rgba(235,242,255,${.88 * sI})`);
+    g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  }
+  if (flash > 0) { g.fillStyle = `rgba(255,255,255,${flash * 3})`; g.fillRect(0, 0, W, H); }
+  if (p.warmth < 25) { g.fillStyle = `rgba(120,180,255,${(25 - p.warmth) / 25 * .25})`; g.fillRect(0, 0, W, H); }
+  if (p.hp < 30) { g.fillStyle = `rgba(200,0,0,${.12 + .08 * Math.sin(time * 6)})`; g.fillRect(0, 0, W, H); }
+}
+
+function bar(x, y, w, v, col, label) {
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(x, y, w, 12);
+  g.fillStyle = col; g.fillRect(x + 1, y + 1, (w - 2) * v / 100, 10);
+  g.fillStyle = '#fff'; g.font = '10px sans-serif'; g.textAlign = 'left'; g.fillText(label, x + 4, y + 10);
+}
+function drawHUD() {
+  bar(10, 10, 120, p.hp, '#e53935', '体力');
+  bar(10, 26, 120, p.stamina, p.exh ? '#ff7043' : '#7cb342', p.exh ? 'スタミナ(疲労)' : 'スタミナ');
+  bar(10, 42, 120, p.warmth, '#42a5f5', '体温');
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(10, 58, 120, 18);
+  g.fillStyle = '#fff'; g.font = '12px sans-serif'; g.textAlign = 'left';
+  g.fillText('🔔 × ' + p.bells, 16, 71);
+  const wi = wx.target === 'rain' ? '☔ 雨' : wx.target === 'snow' ? '❄ 雪' : '☀ 晴れ';
+  g.fillText(wi, 80, 71);
+  g.textAlign = 'right'; g.font = 'bold 18px sans-serif'; g.fillStyle = '#fff';
+  g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 3;
+  const t = `${Math.floor(alt())} m`; g.strokeText(t, W - 30, 26); g.fillText(t, W - 30, 26);
+  g.font = '11px sans-serif'; g.fillText(`${Math.floor(time / 60)}:${String(Math.floor(time % 60)).padStart(2, '0')}`, W - 30, 42);
+  // progress
+  g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(W - 20, 50, 8, 200);
+  const prog = clamp(p.y / GOAL_Y, 0, 1);
+  g.fillStyle = '#ffd54a'; g.fillRect(W - 19, 250 - 198 * prog, 6, 198 * prog);
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(W - 16, 250 - 198 * prog, 6, 0, 7); g.fill();
+  if (p.inHut) { g.fillStyle = 'rgba(255,190,80,.95)'; g.textAlign = 'center'; g.font = 'bold 13px sans-serif'; g.fillText('山小屋で休憩中 — 安全', W / 2, H - 20); }
+  // messages
+  msgs.forEach((m, i) => {
+    g.globalAlpha = Math.min(1, m.t); g.textAlign = 'center'; g.font = 'bold 15px sans-serif';
+    g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = 4; g.strokeText(m.text, W / 2, 110 + i * 24);
+    g.fillStyle = m.color; g.fillText(m.text, W / 2, 110 + i * 24); g.globalAlpha = 1;
+  });
+  if (paused) overlay('一時停止', 'P キーで再開');
+}
+function overlay(title, sub, lines = []) {
+  g.fillStyle = 'rgba(0,0,0,.72)'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = 'bold 30px sans-serif'; g.fillText(title, W / 2, 190);
+  g.font = '15px sans-serif';
+  lines.forEach((l, i) => { g.fillStyle = l.startsWith('!') ? '#ffd54a' : '#ddd'; g.fillText(l.replace(/^!/, ''), W / 2, 240 + i * 25); });
+  g.fillStyle = '#ffd54a'; g.font = 'bold 17px sans-serif'; g.fillText(sub, W / 2, 240 + lines.length * 25 + 30);
+}
+
+function render() {
+  g.save();
+  if (shake > 0 && state === 'play') g.translate(rnd(-1, 1) * shake * 14, rnd(-1, 1) * shake * 14);
+  drawMountain(); drawWorld(); drawWeather();
+  g.restore();
+  drawHUD();
+  if (state === 'over') overlay('遭難…', 'Space / タップでリトライ', ['!原因: ' + cause, `到達高度: ${Math.floor(alt())} m / 3000 m`, `経過時間: ${Math.floor(time)} 秒`]);
+  if (state === 'win') overlay('🏔 登頂成功！', 'Space / タップでもう一度', [`タイム: ${Math.floor(time / 60)}分${Math.floor(time % 60)}秒`, `残り体力: ${Math.round(p.hp)}`, `ベスト残り体力: ${best}`]);
+}
+
+function renderTitle() {
+  const fake = { x: 0 };
+  cam = 0; wx = wx || { rain: 0, snow: 0 }; time = performance.now() / 1000;
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2c5ea8'); gr.addColorStop(1, '#bcd9f5');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#6a7a8c'; g.beginPath(); g.moveTo(0, H); g.lineTo(150, 380); g.lineTo(240, 450); g.lineTo(340, 300); g.lineTo(W, H); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.moveTo(340, 300); g.lineTo(305, 345); g.lineTo(330, 340); g.lineTo(345, 360); g.lineTo(365, 335); g.lineTo(380, 340); g.fill();
+  overlay('🏔 登頂 3000m', 'Space / タップでスタート', [
+    '←→ 移動　↑ 登る　↓ 降りる　Space ベル　P 一時停止　M 消音',
+    '!落石・雪崩・大雨・大雪・滑落・クマ・ライオンに注意',
+    '山小屋の中は安全。体力・スタミナ・体温を管理しよう',
+    'アイテム: 🍙スタミナ 🩹体力 ☕体温 🔔ベル',
+    '雪崩は赤いゾーンの外へ。猛獣はベルで追い払える',
+  ]);
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (state === 'title') renderTitle();
+  else { if (state === 'play' && !paused) update(dt); else if (state !== 'play') { shake = 0; } render(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+window.__game = { get state() { return state; }, start };
+})();
+</script>
+</body>
+</html>
