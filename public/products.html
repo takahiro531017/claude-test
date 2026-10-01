@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>商品マスタ | 在庫管理システム</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header" id="app-header"></header>
+  <main class="container">
+    <h1>商品マスタ</h1>
+    <p class="subtitle">商品の登録・編集と、寸法・重量・在庫閾値の管理を行います。</p>
+
+    <div class="card">
+      <h2 id="formTitle">商品を追加</h2>
+      <div id="message"></div>
+      <form id="form">
+        <input type="hidden" id="id" />
+        <div class="field-row">
+          <div class="field">
+            <label for="code">品番 *</label>
+            <input id="code" required />
+          </div>
+          <div class="field">
+            <label for="name">商品名</label>
+            <input id="name" />
+          </div>
+          <div class="field">
+            <label for="width_m">縦(m)</label>
+            <input id="width_m" type="number" step="0.001" min="0" />
+          </div>
+          <div class="field">
+            <label for="depth_m">横(m)</label>
+            <input id="depth_m" type="number" step="0.001" min="0" />
+          </div>
+          <div class="field">
+            <label for="height_m">高さ(m)</label>
+            <input id="height_m" type="number" step="0.001" min="0" />
+          </div>
+          <div class="field">
+            <label for="volume_m3">当たり㎥</label>
+            <input id="volume_m3" type="number" step="0.0001" min="0" />
+          </div>
+          <div class="field">
+            <label for="weight_kg">重さ(kg)</label>
+            <input id="weight_kg" type="number" step="0.01" min="0" />
+          </div>
+          <div class="field">
+            <label for="low_stock_threshold">在庫僅少の閾値</label>
+            <input id="low_stock_threshold" type="number" step="1" min="0" value="0" />
+          </div>
+        </div>
+        <button type="submit" class="primary">保存</button>
+        <button type="button" class="secondary" id="cancelEdit" style="display:none">編集をキャンセル</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="品番・商品名で検索" style="min-width:240px" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>品番</th><th>商品名</th><th class="text-right">在庫</th>
+              <th class="text-right">縦</th><th class="text-right">横</th><th class="text-right">高さ</th>
+              <th class="text-right">㎥</th><th class="text-right">重さ</th><th class="text-right">閾値</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/products.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>入庫登録 | 在庫管理システム</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header" id="app-header"></header>
+  <main class="container">
+    <h1>入庫登録</h1>
+    <p class="subtitle">商品が入庫したら登録してください。在庫数に自動で加算されます。</p>
+
+    <div class="card">
+      <div id="message"></div>
+      <form id="form">
+        <div class="field-row">
+          <div class="field">
+            <label for="code">品番 *</label>
+            <input id="code" name="code" list="product-list" placeholder="例: KB3-C" required autocomplete="off" />
+            <datalist id="product-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="location">入庫先拠点</label>
+            <select id="location" name="location_id">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="quantity">入庫数量 *</label>
+            <input id="quantity" name="quantity" type="number" min="1" step="1" required />
+          </div>
+          <div class="field">
+            <label for="occurred_at">入庫日時</label>
+            <input id="occurred_at" name="occurred_at" type="datetime-local" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="note">備考</label>
+          <textarea id="note" name="note" rows="2" placeholder="任意"></textarea>
+        </div>
+        <button type="submit" class="primary">入庫を登録</button>
+        <span class="small" id="currentStock"></span>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>直近の入庫履歴</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>日時</th><th>品番</th><th>拠点</th><th class="text-right">数量</th><th>備考</th></tr>
+          </thead>
+          <tbody id="recentRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/inbound.js"></script>
+</body>
+</html>
