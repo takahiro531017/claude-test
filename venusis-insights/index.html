@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="robots" content="noindex" />
+  <title>VENUSiS Instagram 運用レポート</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b6b68'/%3E%3Cpath d='M8 9l8 15 8-15' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <div class="brand">
+        <span class="brand-mark">VENUSiS</span>
+        <span class="brand-sub">Instagram 運用レポート</span>
+      </div>
+      <button type="button" class="btn btn-ghost" id="theme-toggle" aria-label="表示の明るさを切り替える"></button>
+    </div>
+  </header>
+
+  <div id="sample-banner" class="sample-banner" role="status" hidden>
+    <div class="wrap">
+      <strong>サンプルデータです。</strong>
+      実際の数字ではありません。<a href="#import">CSVを読み込む</a>と、自社のデータに切り替わります。
+    </div>
+  </div>
+
+  <main class="wrap">
+    <nav class="toolbar" aria-label="期間の切り替え">
+      <div class="seg" id="range-seg" role="group" aria-label="集計する期間"></div>
+      <p class="period-label" id="period-label" aria-live="polite"></p>
+    </nav>
+
+    <section id="empty" class="card empty" hidden>
+      <h2>まだデータがありません</h2>
+      <p>Meta Business Suite から書き出したCSVを読み込むと、ここに成果が表示されます。</p>
+      <div class="btn-row">
+        <a class="btn btn-primary" href="#import">CSVを読み込む</a>
+        <button type="button" class="btn" id="empty-sample">サンプルデータを見る</button>
+      </div>
+    </section>
+
+    <div id="report">
+      <section aria-labelledby="h-kpi">
+        <h2 id="h-kpi" class="section-title">今月の成果<span class="section-note" id="kpi-note"></span></h2>
+        <div class="kpis" id="kpis"></div>
+      </section>
+
+      <section aria-labelledby="h-insights">
+        <h2 id="h-insights" class="section-title">気づき<span class="section-note">データから自動で作った文章です</span></h2>
+        <ul class="insights card" id="insights"></ul>
+      </section>
+
+      <section aria-labelledby="h-trend">
+        <h2 id="h-trend" class="section-title">月ごとの推移<span class="section-note">期間の切り替えに関係なく、全期間を表示</span></h2>
+        <div class="card chart-card">
+          <h3>月別の合計リーチ<span class="unit">（人）</span></h3>
+          <div class="chart-box"><canvas id="c-month-reach" role="img" aria-label="月別の合計リーチの棒グラフ"></canvas></div>
+          <details class="table-view"><summary>数値を表で見る</summary><div id="t-month-reach"></div></details>
+        </div>
+        <div class="card chart-card">
+          <h3>月別の平均エンゲージメント率<span class="unit">（%）</span></h3>
+          <div class="chart-box"><canvas id="c-month-er" role="img" aria-label="月別の平均エンゲージメント率の折れ線グラフ"></canvas></div>
+          <details class="table-view"><summary>数値を表で見る</summary><div id="t-month-er"></div></details>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-type">
+        <h2 id="h-type" class="section-title">投稿タイプ別<span class="section-note">リール・フィード・ストーリーズ</span></h2>
+        <div class="grid-2">
+          <div class="card chart-card">
+            <h3>平均リーチ<span class="unit">（1投稿あたり）</span></h3>
+            <div class="chart-box short"><canvas id="c-type-reach" role="img" aria-label="投稿タイプ別の平均リーチ"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <h3>平均エンゲージメント率<span class="unit">（1投稿あたり）</span></h3>
+            <div class="chart-box short"><canvas id="c-type-er" role="img" aria-label="投稿タイプ別の平均エンゲージメント率"></canvas></div>
+          </div>
+        </div>
+        <details class="table-view card"><summary>数値を表で見る</summary><div id="t-type"></div></details>
+      </section>
+
+      <section aria-labelledby="h-heat">
+        <h2 id="h-heat" class="section-title">いつ投稿すると届きやすいか<span class="section-note">平均リーチ・ストーリーズを除く</span></h2>
+        <div class="card" id="heatmap"></div>
+      </section>
+
+      <section aria-labelledby="h-rank">
+        <h2 id="h-rank" class="section-title">投稿ランキング</h2>
+        <div class="card" id="ranking"></div>
+      </section>
+    </div>
+
+    <section id="import" aria-labelledby="h-import">
+      <h2 id="h-import" class="section-title">データ入力</h2>
+      <div class="card" id="import-panel"></div>
+    </section>
+
+    <section id="handover" aria-labelledby="h-handover">
+      <h2 id="h-handover" class="section-title">はじめての方へ・毎月のやること</h2>
+      <div id="handover-panel"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>データはこの端末のブラウザの中だけで処理・保存され、外部のサーバーには送信されません。</p>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

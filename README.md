@@ -1,9 +1,15 @@
-# 在庫管理システム
+# claude-test
+
+- **在庫管理システム**（リポジトリ直下） — 入出庫を登録すると在庫数が自動計算されるWebアプリ。詳細は下記。
+- [`venusis-insights/`](./venusis-insights/) — VENUSiS Instagram 運用レポート（静的ダッシュボード）。操作マニュアルは [`venusis-insights/README.md`](./venusis-insights/README.md)。
+- `docs/` — 修理台帳サイト（別件）。
+
+## 在庫管理システム
 
 入出庫を登録すると在庫数が自動計算される、ブラウザで使う在庫管理アプリです。
 Node.js (Express) + libSQL(SQLite互換) で動作し、ビルド不要でそのまま起動できます。
 
-## ローカルでのセットアップ
+### ローカルでのセットアップ
 
 ```bash
 npm install
@@ -17,13 +23,13 @@ npm start
 
 ローカル実行時はデータを `data/inventory.db`（SQLiteファイル、Git管理対象外）に保存します。
 
-## インターネット上に公開する（Turso + Render、どちらも無料枠あり）
+### インターネット上に公開する（Turso + Render、どちらも無料枠あり）
 
 ローカルにNode.jsを入れず、ブラウザだけでアクセスできるようにする手順です。
 DBをクラウド（[Turso](https://turso.tech)）に置くことで、Renderの無料プランでも
 サーバー再起動でデータが消えません。
 
-### 1. Turso（データベース）を用意する
+#### 1. Turso（データベース）を用意する
 
 1. https://turso.tech で無料アカウントを作成
 2. [Turso CLI](https://docs.turso.tech/cli/installation) をインストールしてログイン
@@ -34,7 +40,7 @@ DBをクラウド（[Turso](https://turso.tech)）に置くことで、Renderの
    turso db tokens create inventory-app      # → TURSO_AUTH_TOKEN
    ```
 
-### 2. Render（ホスティング）にデプロイする
+#### 2. Render（ホスティング）にデプロイする
 
 1. https://render.com で無料アカウントを作成し、GitHubリポジトリ（このリポジトリ）を接続
 2. "New +" → "Blueprint" を選び、このリポジトリの `render.yaml` を検出させる
@@ -48,7 +54,7 @@ DBをクラウド（[Turso](https://turso.tech)）に置くことで、Renderの
 `TURSO_DATABASE_URL` が設定されていない場合は自動的にローカルファイルにフォールバックするため、
 開発中はこれまで通り `npm start` だけで動作します。
 
-## 画面構成
+### 画面構成
 
 - **ダッシュボード**: 商品ごとの現在庫を一覧表示。在庫僅少・欠品を検索/フィルタ可能
 - **入庫登録**: 品番・拠点・数量を入力すると在庫に加算
