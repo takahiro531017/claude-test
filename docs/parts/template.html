@@ -5,77 +5,123 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>オークローン部品表</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--fg:#1d2330;--mute:#6b7383;--line:#dfe3ea;--acc:#0b63ce;--accbg:#e6f0fd;--mark:#ffe36b;--warn:#b42318}
-@media (prefers-color-scheme:dark){:root{--bg:#14171d;--card:#1c2029;--fg:#e8ebf1;--mute:#98a1b3;--line:#323949;--acc:#6aa8ff;--accbg:#22314a;--mark:#7a6400;--warn:#ff8a80}}
+:root{--bg:#f4f6f9;--card:#fff;--fg:#1d2330;--mute:#6b7383;--line:#dfe3ea;--acc:#0b63ce;--accbg:#e6f0fd;--mark:#ffe36b;--warn:#b42318;--warnbg:#fde8e6;--ng:#8a5a00;--ngbg:#fff1d6;--okc:#1a7f4b}
+@media (prefers-color-scheme:dark){:root{--bg:#14171d;--card:#1c2029;--fg:#e8ebf1;--mute:#98a1b3;--line:#323949;--acc:#6aa8ff;--accbg:#22314a;--mark:#7a6400;--warn:#ff8a80;--warnbg:#4a2420;--ng:#ffd27a;--ngbg:#4a3a14;--okc:#5fd39a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 "Hiragino Sans","Noto Sans JP",Meiryo,sans-serif}
-header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px}
-h1{font-size:17px;margin:0 0 8px}
+header{position:sticky;top:0;z-index:6;background:var(--card);border-bottom:1px solid var(--line);padding:8px 16px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+h1{font-size:17px;margin:0;cursor:pointer}
+.tb{display:flex;gap:4px}
 .sb{display:flex;gap:8px}
-#q{flex:1;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);min-width:0}
+#q{flex:1;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);min-width:0}
 #q:focus{outline:2px solid var(--acc);border-color:transparent}
-button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:5px 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
 .hint{font-size:12px;color:var(--mute);margin-top:4px}
-nav{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:var(--hh,100px);z-index:4;scrollbar-width:thin}
-nav button{white-space:nowrap;padding:4px 10px;font-size:13px;border-radius:99px}
+kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:var(--hh,100px);z-index:5;scrollbar-width:thin}
+nav button{white-space:nowrap;padding:4px 10px;font-size:.88em;border-radius:99px}
 nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-nav button .n{background:var(--mark);color:var(--fg);border-radius:99px;padding:0 6px;margin-left:4px;font-size:11px}
-main{padding:14px 16px 60px;max-width:1200px;margin:0 auto}
-h2{font-size:16px;margin:0 0 8px}
+.n{background:var(--mark);color:var(--fg);border-radius:99px;padding:0 6px;margin-left:4px;font-size:11px}
+main{padding:14px 16px 90px;max-width:1200px;margin:0 auto}
+h2{font-size:1.05em;margin:0 0 8px;display:flex;gap:10px;align-items:center}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;min-width:560px}
 td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;white-space:pre-wrap;word-break:break-word;font-size:.9em}
 td.num{white-space:nowrap}
-tr.first td{background:var(--accbg);font-weight:600}
 tr.hit td{background:color-mix(in srgb,var(--mark) 25%,transparent)}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
-.res{display:grid;gap:8px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}
-.card:hover{border-color:var(--acc)}
-.card .s{font-size:12px;color:var(--acc);font-weight:600}
-.card .cells{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px}
-.card .cells span{white-space:pre-wrap;font-size:.92em}
-.empty{color:var(--mute);padding:30px 0;text-align:center}
-.cnt{color:var(--mute);font-size:13px;margin:0 0 10px}
-.seg{display:inline-flex;gap:0;margin-bottom:10px}
-.seg button{border-radius:0}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0}
-.seg .on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em;background:var(--accbg);color:var(--acc);border-radius:4px;padding:0 4px;cursor:copy;white-space:nowrap}
 .code:hover{outline:1px solid var(--acc)}
-.bd{display:inline-block;font-size:11.5px;font-weight:700;border-radius:4px;padding:0 5px;margin:0 1px;background:#fde8e6;color:var(--warn);white-space:nowrap}
-.bd.ok{background:#fff1d6;color:#8a5a00}
-@media (prefers-color-scheme:dark){.bd{background:#4a2420}.bd.ok{background:#4a3a14;color:#ffd27a}}
-.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;font-size:13px}
-.tools label{cursor:pointer;display:inline-flex;gap:4px;align-items:center}
-.gh{font-size:13px;font-weight:700;color:var(--mute);margin:14px 0 6px}
-.rec{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;align-items:center;font-size:13px;color:var(--mute)}
-.rec button{padding:2px 10px;border-radius:99px;font-size:13px}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:9}
-#toast.on{opacity:.95}
-.fs{display:flex;gap:4px}.fs button{padding:2px 8px}
-.sb{align-items:center}
-kbd{border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px}
-@media print{header,nav,.seg,.tools,.rec,#toast{display:none}.wrap{border:0;overflow:visible}td{font-size:11px}}
+.bd{display:inline-block;font-size:.8em;font-weight:700;border-radius:4px;padding:0 5px;margin:0 1px;background:var(--warnbg);color:var(--warn);white-space:nowrap}
+.bd.ok{background:var(--ngbg);color:var(--ng)}
+/* ホーム */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.tile:hover{border-color:var(--acc);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.tile .im{height:120px;background:#fff;display:flex;align-items:center;justify-content:center}
+.tile .im img{max-width:100%;max-height:120px;object-fit:contain}
+.tile .im span{color:#bbb;font-size:34px}
+.tile .tx{padding:8px 10px}.tile b{display:block;font-size:.95em}.tile small{color:var(--mute)}
+.lead{color:var(--mute);margin:0 0 12px}
+/* 結果 */
+.fl{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 8px;font-size:.88em}
+.fl label{cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+.fl select{font:inherit;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chips button{padding:2px 10px;border-radius:99px;font-size:.85em}
+.chips button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.seg{display:inline-flex;margin-bottom:10px}
+.seg button{border-radius:0}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0}
+.seg .on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.cnt{color:var(--mute);font-size:.88em;margin:0 0 10px}
+.gh{font-size:.88em;font-weight:700;color:var(--mute);margin:14px 0 6px}
+.res{display:grid;gap:8px}
+.card{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--okc);border-radius:10px;padding:8px 12px;cursor:pointer;position:relative}
+.card.st-dead{border-left-color:#d92d20}.card.st-ng{border-left-color:#e0a000}
+.card:hover{border-color:var(--acc)}
+.ch{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ch .s{font-size:.8em;color:var(--acc);font-weight:700}
+.price{font-weight:700;background:var(--accbg);border-radius:4px;padding:0 6px}
+.act{margin-left:auto;display:flex;gap:4px}
+.act button{padding:2px 10px;font-size:.85em}
+.act .fav.on{color:#e0a000;border-color:#e0a000}
+.cells{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px}
+.cells span{white-space:pre-wrap;font-size:.92em}
+.cells span:first-child{font-weight:600}
 .pics{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .pics img{max-width:110px;max-height:110px;object-fit:contain;border-radius:4px;background:#fff;cursor:zoom-in}
-#lb{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:20;cursor:zoom-out}
-#lb.on{display:flex}#lb img{max-width:94vw;max-height:94vh;background:#fff;border-radius:6px}
+.card .pics img{max-width:84px;max-height:84px}
+.memo{width:100%;margin-top:6px;font:inherit;font-size:.9em;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.empty{color:var(--mute);padding:30px 0;text-align:center}
+/* 選択バー・トースト・ライトボックス・ダイアログ */
+#bar{position:fixed;left:0;right:0;bottom:0;background:var(--acc);color:#fff;padding:10px 16px;display:none;gap:10px;align-items:center;z-index:8}
+#bar.on{display:flex}#bar button{color:var(--fg)}
+#toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:30;max-width:90vw}
+#toast.on{opacity:.95}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:20}
+#lb.on{display:flex}#lb img{max-width:90vw;max-height:90vh;background:#fff;border-radius:6px}
+#lb button{position:absolute;top:50%;font-size:26px;background:rgba(255,255,255,.85);color:#000}
+#lb .pv{left:8px}#lb .nx{right:8px}
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:25;padding:16px}
+#dlg.on{display:flex}
+#dlg .box{background:var(--card);border-radius:12px;padding:16px;max-width:560px;width:100%;max-height:85vh;overflow:auto}
+.ph{border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0;display:flex;gap:8px;align-items:flex-start}
+.ph p{margin:0;flex:1;white-space:pre-wrap;font-size:.92em}
+#dlg textarea{width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+@media (max-width:640px){
+  header{position:fixed;top:auto;bottom:0;left:0;right:0;border-top:1px solid var(--line);border-bottom:0;padding:6px 10px}
+  .top{display:none}.hint{display:none}
+  nav{top:0}
+  main{padding-bottom:110px}
+  #bar{bottom:56px}#toast{bottom:120px}
+  .tb-m{display:flex}
+}
+@media print{header,nav,.seg,.fl,.chips,#toast,#bar,.noprint{display:none}.wrap{border:0;overflow:visible}td{font-size:11px}main{padding:0}}
 </style>
 </head>
 <body>
 <header id="hd">
-  <h1>オークローン部品表</h1>
-  <div class="sb"><input id="q" type="search" placeholder="型番・部品名・品番などで検索（スペースでAND）" autocomplete="off"><button id="clr">クリア</button><span class="fs"><button id="fm" title="文字を小さく">A−</button><button id="fp" title="文字を大きく">A＋</button></span></div>
-  <div class="hint">全角/半角・ひらがな/カタカナ・大文字/小文字は区別しません。スペースでAND検索。<kbd>/</kbd>で検索欄へ、<kbd>Esc</kbd>でクリア。品番(青)をクリックでコピー。</div>
+  <div class="top"><h1 id="home" title="ホームへ">オークローン部品表</h1>
+    <div class="tb"><button id="ph" title="定型文">定型文</button><button id="fm" title="文字を小さく">A−</button><button id="fp" title="文字を大きく">A＋</button></div></div>
+  <div class="sb"><input id="q" type="search" placeholder="品番・部品名・商品名で検索（スペースでAND）" autocomplete="off"><button id="clr">クリア</button></div>
+  <div class="hint">全角/半角・ひらがな/カタカナ・大文字/小文字・ハイフンは区別しません。<kbd>/</kbd>で検索欄へ、<kbd>Esc</kbd>でホームへ。青い品番をクリックでコピー。</div>
 </header>
 <nav id="nav"></nav>
-<main id="main"></main><div id="toast"></div><div id="lb"><img alt=""></div>
+<main id="main"></main>
+<div id="bar"><span id="barn"></span><button id="barcp">選択をコピー</button><button id="barx">解除</button></div>
+<div id="toast"></div>
+<div id="lb"><button class="pv">‹</button><img alt=""><button class="nx">›</button></div>
+<div id="dlg"><div class="box"><b>定型文</b>（クリックでコピー。内容は自由に編集できます。この端末に保存されます）<div id="phl"></div><textarea id="phn" rows="2" placeholder="新しい定型文"></textarea><div style="margin-top:6px;display:flex;gap:8px"><button id="pha">追加</button><button id="phx">閉じる</button></div></div></div>
 <script>
 const DATA=/*DATA*/null;
 const IMGS=/*IMGS*/[];
 const $=s=>document.querySelector(s);
-const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/\s+/g,"");
-const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]);
+const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s\-_ー・]+/g,"");
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const J={get(k,d){try{return JSON.parse(LS.get(k,"null"))??d}catch(e){return d}},set(k,v){LS.set(k,JSON.stringify(v))}};
 
 function hl0(s,terms){
   if(!terms.length||!s)return esc(s);
@@ -87,9 +133,8 @@ function hl0(s,terms){
   for(let i=0;i<s.length;i++){if(on[i]&&!open){o+="<mark>";open=true}if(!on[i]&&open){o+="</mark>";open=false}o+=esc(s[i])}
   return o+(open?"</mark>":"");
 }
-// 品番(クリックでコピー)と 終売/廃盤 等のバッジを付けて表示
 const RE=/((?<![A-Za-z0-9])(?=[A-Z0-9-]*(?:\d|KD))[A-Z][A-Z0-9-]{4,}(?![A-Za-z0-9])|MGT-[A-Z]+)|(メーカー終売|メーカー廃盤|終売|廃盤|完売|供給終了|生産終了|取り寄せ不可|取寄不可|取り寄せ出来ず|修理対応)/g;
-const BAD=/終売|廃盤|完売|供給終了|生産終了/;
+const BAD=/終売|廃盤|完売|供給終了|生産終了/, NG=/取り寄せ不可|取寄不可|取り寄せ出来ず|修理対応/;
 function hl(s,terms){
   if(!s)return"";let o="",p=0,m;RE.lastIndex=0;
   while((m=RE.exec(s))){
@@ -100,76 +145,160 @@ function hl(s,terms){
   }
   return o+hl0(s.slice(p),terms);
 }
-DATA.forEach((sh,i)=>{sh.i=i;sh.rows.forEach(r=>{const tx=(r.c||[]).map(c=>c[0]).join(" ");r.t=norm(tx);r.dead=BAD.test(tx)})});
-let cur=0,mode="list",terms=[],hideDead=false;
-const LS={get(k,d){try{return localStorage.getItem(k)??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-const rowHit=r=>terms.length&&terms.every(t=>r.t.includes(t))&&!(hideDead&&r.dead);
-function hits(sh){return terms.length?sh.rows.filter(rowHit):[]}
-function renderNav(){
-  $("#nav").innerHTML=DATA.map(sh=>{const h=hits(sh).length;
-    return `<button data-i="${sh.i}" class="${sh.i===cur&&!(terms.length&&mode==='list')?'on':''}">${esc(sh.name)}${h?`<span class="n">${h}</span>`:''}</button>`}).join("");
+// ---- 行データの下ごしらえ
+const yen=n=>"¥"+n.toLocaleString("ja-JP");
+const BYKEY={};
+DATA.forEach((sh,i)=>{
+  sh.i=i;sh.codes=new Set();sh.img=null;
+  sh.rows.forEach(r=>{
+    r.sh=sh;r.key=sh.name+"|"+r.r;BYKEY[r.key]=r;
+    const cs=r.c||[];const tx=cs.map(c=>c[0]).join(" ");
+    r.t=norm(tx);r.dead=BAD.test(tx);r.ng=NG.test(tx);
+    r.imgs=cs.flatMap(c=>c[4]||[]);if(!sh.img&&r.imgs.length)sh.img=r.imgs[0];
+    r.codes=[];RE.lastIndex=0;let m;while((m=RE.exec(tx)))if(m[1]&&!r.codes.includes(m[1])){r.codes.push(m[1]);sh.codes.add(m[1])}
+    r.cn=r.codes.map(norm);
+    let price=null;
+    for(const c of cs){const v=c[0];if(!v)continue;
+      const q=v.match(/定価[^\d]{0,4}([\d,]{3,})/);if(q){price=+q[1].replace(/,/g,"");break}
+      if(/^[\d,]{3,7}$/.test(v)&&!/^(19|20)\d\d$/.test(v)){const n=+v.replace(/,/g,"");if(n>=100){price=n;break}}}
+    r.price=price;
+    r.st=r.dead?"dead":r.ng?"ng":"ok";
+  });
+});
+let view="home",cur=0,terms=[],style="card",sel=new Set(),selSheets=new Set(),noDead=false,noNG=false,withImg=false,sort="table";
+let favs=new Set(J.get("favs",[])),memos=J.get("memos",{});
+const rowHit=r=>terms.length&&terms.every(t=>r.t.includes(t));
+function pass(r){return rowHit(r)&&!(noDead&&r.dead)&&!(noNG&&r.ng)&&!(withImg&&!r.imgs.length)}
+function results(ignoreSel){
+  let a=[];DATA.forEach(sh=>{if(!ignoreSel&&selSheets.size&&!selSheets.has(sh.i))return;sh.rows.forEach(r=>{if(r.c&&pass(r))a.push(r)})});
+  const ex=r=>terms.some(t=>r.cn.includes(t))?0:1;
+  if(sort==="up"||sort==="down"){const d=sort==="up"?1:-1;a.sort((x,y)=>(x.price==null)-(y.price==null)||d*((x.price||0)-(y.price||0)))}
+  else a.sort((x,y)=>ex(x)-ex(y)||0);
+  return a;
+}
+// ---- 描画
+function copyText(r){
+  const ttl=(r.c.map(c=>c[0]).find(v=>v&&!r.codes.includes(v))||"").split("\n")[0].slice(0,40);
+  return [r.sh.name,r.codes.join(" / "),ttl,r.price?"定価"+yen(r.price):""].filter(Boolean).join("｜");
+}
+function picsHTML(r){return r.imgs.length?`<div class="pics">${r.imgs.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}</div>`:""}
+function cardHTML(r){
+  const stl={dead:"終売・廃盤の記載あり",ng:"取り寄せ不可・修理対応の記載あり",ok:"終売・不可の記載なし"}[r.st];
+  const m=memos[r.key];
+  return`<div class="card st-${r.st}" data-k="${esc(r.key)}" title="${stl}">
+<div class="ch"><input type="checkbox" class="sel" ${sel.has(r.key)?"checked":""} aria-label="選択"><span class="s">${esc(r.sh.name)}</span>${r.price?`<span class="price">${yen(r.price)}</span>`:""}
+<span class="act"><button class="fav ${favs.has(r.key)?"on":""}" title="お気に入り">${favs.has(r.key)?"★":"☆"}</button><button class="cp">コピー</button><button class="mm">メモ</button></span></div>
+<div class="cells">${r.c.filter(c=>c[0]).map(c=>`<span>${hl(c[0],terms)}</span>`).join("")}</div>${picsHTML(r)}
+${m!=null?`<textarea class="memo" rows="2" placeholder="メモ">${esc(m)}</textarea>`:""}</div>`;
 }
 function sheetHTML(sh){
   const body=sh.rows.map(r=>{
     if(!r.c)return"";
     const tds=r.c.map(([v,rs,cs,_c,im])=>`<td${/^[\d,.]+$/.test(v)?` class=num`:""}${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}${im?`<div class="pics">${im.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}</div>`:""}</td>`).join("");
     return`<tr id="r${sh.i}_${r.r}" class="${rowHit(r)?'hit':''}">${tds}</tr>`}).join("");
-  return`<h2>${esc(sh.name)}</h2><div class="wrap"><table>${body}</table></div>`;
+  return`<h2>${esc(sh.name)}<button class="noprint" onclick="print()">印刷</button></h2><div class="wrap"><table>${body}</table></div>`;
+}
+function homeHTML(){
+  return`<p class="lead">商品を選ぶか、上の検索欄に品番・部品名を入力してください。</p><div class="tiles">`+DATA.map(sh=>{
+    const coded=sh.rows.filter(r=>r.codes.length),dead=coded.filter(r=>r.dead).length;
+    return`<div class="tile" data-s="${sh.i}"><div class="im">${sh.img!=null?`<img src="${IMGS[sh.img]}" alt="">`:"<span>📦</span>"}</div><div class="tx"><b>${esc(sh.name)}</b><small>品番 ${sh.codes.size}件</small>${coded.length&&dead/coded.length>=.5?` <span class="bd">終売・廃盤が多い</span>`:""}</div></div>`}).join("")+`</div>`;
+}
+function filtersHTML(){
+  const per=DATA.map(sh=>[sh,results(true).filter(r=>r.sh===sh).length]).filter(x=>x[1]);
+  return`<div class="chips">${per.map(([sh,n])=>`<button data-sf="${sh.i}" class="${selSheets.has(sh.i)?"on":""}">${esc(sh.name)} ${n}</button>`).join("")}</div>
+<div class="fl"><label><input type="checkbox" id="fd" ${noDead?"checked":""}> 終売・廃盤を除く</label><label><input type="checkbox" id="fn" ${noNG?"checked":""}> 取り寄せ不可・修理対応を除く</label><label><input type="checkbox" id="fi" ${withImg?"checked":""}> 画像ありのみ</label>
+<label>並び順 <select id="so"><option value="table" ${sort==="table"?"selected":""}>表の順（品番一致を先頭）</option><option value="up" ${sort==="up"?"selected":""}>定価の安い順</option><option value="down" ${sort==="down"?"selected":""}>定価の高い順</option></select></label></div>`;
 }
 function listHTML(){
-  let total=0;const out=[];
-  DATA.forEach(sh=>{const h=hits(sh);if(!h.length)return;total+=h.length;
-    out.push(`<div class="gh">${esc(sh.name)}（${h.length}件）</div>`);
-    h.forEach(r=>out.push(`<div class="card" data-i="${sh.i}" data-r="${r.r}"><div class="cells">${r.c.filter(c=>c[0]).map(c=>`<span>${hl(c[0],terms)}</span>`).join("")}</div></div>`))});
-  return{total,html:out.join("")}
+  const a=results(false);
+  let h=`<div class="seg"><button data-v="list" class="on">カード表示</button><button data-v="sheet">表で見る（${esc(DATA[cur].name)}）</button></div>`+filtersHTML();
+  if(!a.length)return h+'<div class="empty">見つかりませんでした。別の表記（品番の一部・ひらがな等）でもお試しください</div>';
+  h+=`<p class="cnt">${a.length}件ヒット。カードをクリックで元の表の位置へ</p><div class="res">`;
+  let last=null;
+  a.forEach(r=>{if(sort==="table"&&r.sh!==last){last=r.sh;h+=`<div class="gh">${esc(r.sh.name)}</div>`}h+=cardHTML(r)});
+  return h+"</div>";
 }
-function recent(){try{return JSON.parse(LS.get("recent","[]"))}catch(e){return[]}}
-function pushRecent(q){if(!q)return;const r=[q,...recent().filter(x=>x!==q)].slice(0,8);LS.set("recent",JSON.stringify(r))}
+function favHTML(){
+  const a=[...favs].map(k=>BYKEY[k]).filter(Boolean);
+  return a.length?`<p class="cnt">お気に入り ${a.length}件（この端末に保存）</p><div class="res">${a.map(cardHTML).join("")}</div>`:'<div class="empty">カードの ☆ を押すとここに登録されます</div>';
+}
+function renderNav(){
+  const counts=terms.length?results(true):[];
+  $("#nav").innerHTML=`<button data-nv="home" class="${view==="home"?"on":""}">ホーム</button><button data-nv="fav" class="${view==="fav"?"on":""}">★お気に入り${favs.size?`<span class="n">${favs.size}</span>`:""}</button>`+
+    DATA.map(sh=>{const h=counts.filter(r=>r.sh===sh).length;return`<button data-i="${sh.i}" class="${view==="sheet"&&sh.i===cur?"on":""}">${esc(sh.name)}${h?`<span class="n">${h}</span>`:""}</button>`}).join("");
+}
 function render(scrollTo){
   const m=$("#main");
-  if(terms.length){
-    const seg=`<div class="seg"><button data-m="list" class="${mode==='list'?'on':''}">検索結果一覧</button><button data-m="sheet" class="${mode==='sheet'?'on':''}">シート表示（${esc(DATA[cur].name)}）</button></div>`;
-    const tools=`<div class="tools"><label><input type="checkbox" id="hd2" ${hideDead?'checked':''}> 終売・廃盤・完売の行を隠す</label></div>`;
-    if(mode==="list"){const l=listHTML();
-      m.innerHTML=seg+tools+`<p class="cnt">${l.total}件ヒット。行をクリックで元の表の位置へ移動</p>`+(l.total?`<div class="res">${l.html}</div>`:'<div class="empty">見つかりませんでした。別の表記（型番の一部・ひらがな等）でもお試しください</div>');
-    }else m.innerHTML=seg+tools+sheetHTML(DATA[cur]);
-  }else{
-    const rc=recent();
-    m.innerHTML=(rc.length?`<div class="rec">最近の検索：${rc.map(x=>`<button data-rq="${esc(x)}">${esc(x)}</button>`).join("")}</div>`:"")+sheetHTML(DATA[cur]);
-  }
-  renderNav();saveHash();
+  if(view==="home")m.innerHTML=homeHTML();
+  else if(view==="fav")m.innerHTML=favHTML();
+  else if(view==="list")m.innerHTML=listHTML();
+  else m.innerHTML=(terms.length?`<div class="seg"><button data-v="list">カード表示</button><button data-v="sheet" class="on">表で見る（${esc(DATA[cur].name)}）</button></div>`:"")+sheetHTML(DATA[cur]);
+  renderNav();renderBar();saveHash();
   if(scrollTo){const e=document.getElementById(scrollTo);if(e)e.scrollIntoView({block:"center"})}
 }
-function saveHash(){const h=(terms.length?"q="+encodeURIComponent($("#q").value):"")+"&s="+cur+(terms.length&&mode==="sheet"?"&m=sheet":"");try{history.replaceState(null,"","#"+h)}catch(e){}}
-function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("on"),1400)}
-function setQ(v){$("#q").value=v;terms=v.split(/[\s　]+/).map(norm).filter(Boolean);mode="list"}
-let rt;
-$("#q").addEventListener("input",e=>{setQ(e.target.value);render();clearTimeout(rt);rt=setTimeout(()=>pushRecent(e.target.value.trim()),1200)});
-$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"){pushRecent(e.target.value.trim());e.target.blur()}});
+function renderBar(){$("#bar").classList.toggle("on",sel.size>0);$("#barn").textContent=sel.size+"件選択中"}
+function saveHash(){const h=new URLSearchParams();if(terms.length)h.set("q",$("#q").value);h.set("s",cur);if(view==="sheet")h.set("v","sheet");try{history.replaceState(null,"","#"+h)}catch(e){}}
+function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("on"),1500)}
+function copy(t,msg){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast(msg||"コピーしました"),()=>{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast(msg||"コピーしました")}catch(e){toast("コピーできませんでした")}a.remove()})}
+function setQ(v){$("#q").value=v;terms=v.split(/[\s　]+/).map(norm).filter(Boolean);selSheets.clear();view=terms.length?"list":"home"}
+// ---- 入力
+$("#q").addEventListener("input",e=>{setQ(e.target.value);render()});
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter")e.target.blur()});
 $("#clr").onclick=()=>{setQ("");render();$("#q").focus()};
-addEventListener("keydown",e=>{
-  if(e.key==="/"&&document.activeElement!==$("#q")){e.preventDefault();$("#q").focus();$("#q").select()}
-  else if(e.key==="Escape"){setQ("");render();$("#q").blur()}
-});
-$("#nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;mode="sheet";render();scrollTo(0,0)};
-$("#lb").onclick=()=>$("#lb").classList.remove("on");
+$("#home").onclick=()=>{setQ("");render()};
+$("#nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.nv==="home"){setQ("");render()}else if(b.dataset.nv==="fav"){view="fav";render()}
+  else{cur=+b.dataset.i;view="sheet";render();scrollTo(0,0)}};
+// ---- ライトボックス
+let lbSet=[],lbI=0;
+function lbShow(){$("#lb img").src=lbSet[lbI];$("#lb").classList.add("on");$("#lb .pv").style.display=$("#lb .nx").style.display=lbSet.length>1?"":"none"}
+$("#lb").onclick=e=>{if(e.target.closest(".pv")){lbI=(lbI+lbSet.length-1)%lbSet.length;lbShow()}else if(e.target.closest(".nx")){lbI=(lbI+1)%lbSet.length;lbShow()}else $("#lb").classList.remove("on")};
+// ---- メイン領域のクリック
 $("#main").onclick=e=>{
-  const im=e.target.closest(".pics img");if(im){$("#lb img").src=im.src;$("#lb").classList.add("on");return}
-  const cd=e.target.closest(".code");
-  if(cd){const c=cd.dataset.c;(navigator.clipboard?navigator.clipboard.writeText(c):Promise.reject()).then(()=>toast("コピーしました："+c),()=>toast(c));e.stopPropagation();return}
-  const rq=e.target.closest("[data-rq]");if(rq){setQ(rq.dataset.rq);render();return}
-  const b=e.target.closest("[data-m]");if(b){mode=b.dataset.m;render();return}
-  const c=e.target.closest(".card");if(c){cur=+c.dataset.i;mode="sheet";render(`r${cur}_${c.dataset.r}`)}
+  const T=s=>e.target.closest(s);
+  let x;
+  if(x=T(".pics img")){const box=T(".card,td")||x.parentNode;lbSet=[...box.querySelectorAll(".pics img")].map(i=>i.src);lbI=Math.max(0,lbSet.indexOf(x.src));lbShow();return}
+  if(x=T(".code")){copy(x.dataset.c,"コピーしました："+x.dataset.c);return}
+  if(x=T(".tile")){cur=+x.dataset.s;view="sheet";render();scrollTo(0,0);return}
+  if(x=T("[data-v]")){view=x.dataset.v;render();return}
+  if(x=T("[data-sf]")){const i=+x.dataset.sf;selSheets.has(i)?selSheets.delete(i):selSheets.add(i);render();return}
+  const card=T(".card");
+  if(card){const r=BYKEY[card.dataset.k];
+    if(T(".sel")){e.target.checked?sel.add(r.key):sel.delete(r.key);renderBar();return}
+    if(T(".fav")){favs.has(r.key)?favs.delete(r.key):favs.add(r.key);J.set("favs",[...favs]);render();return}
+    if(T(".cp")){copy(copyText(r));return}
+    if(T(".mm")){if(memos[r.key]==null)memos[r.key]="";J.set("memos",memos);const keep=card.dataset.k;render();const t=[...document.querySelectorAll(".card")].find(c=>c.dataset.k===keep);t&&t.querySelector(".memo")&&t.querySelector(".memo").focus();return}
+    if(T(".memo"))return;
+    cur=r.sh.i;view="sheet";render(`r${cur}_${r.r}`)}
 };
-$("#main").addEventListener("change",e=>{if(e.target.id==="hd2"){hideDead=e.target.checked;render()}});
+$("#main").addEventListener("change",e=>{const id=e.target.id;
+  if(id==="fd")noDead=e.target.checked;else if(id==="fn")noNG=e.target.checked;else if(id==="fi")withImg=e.target.checked;else if(id==="so")sort=e.target.value;else return;render()});
+$("#main").addEventListener("input",e=>{const c=e.target.closest(".card");if(c&&e.target.classList.contains("memo")){const v=e.target.value;if(v)memos[c.dataset.k]=v;else memos[c.dataset.k]="";J.set("memos",memos)}});
+$("#barx").onclick=()=>{sel.clear();render()};
+$("#barcp").onclick=()=>copy([...sel].map(k=>copyText(BYKEY[k])).join("\n"),sel.size+"件をコピーしました");
+// ---- 定型文
+const DEF_PH=["こちらの部品は、メーカーへお客様から直接ご注文をお願いしております。フリーダイヤル 0120-096-013 までご連絡ください。（内容は編集してください）"];
+let phs=J.get("phrases",DEF_PH);
+function renderPh(){$("#phl").innerHTML=phs.map((p,i)=>`<div class="ph"><p>${esc(p)}</p><button data-c="${i}">コピー</button><button data-d="${i}">削除</button></div>`).join("")||"<p>まだありません</p>"}
+$("#ph").onclick=()=>{renderPh();$("#dlg").classList.add("on")};
+$("#phx").onclick=()=>$("#dlg").classList.remove("on");
+$("#pha").onclick=()=>{const v=$("#phn").value.trim();if(!v)return;phs.push(v);J.set("phrases",phs);$("#phn").value="";renderPh()};
+$("#phl").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.c!=null)copy(phs[+b.dataset.c]);else{phs.splice(+b.dataset.d,1);J.set("phrases",phs);renderPh()}};
+// ---- キー・文字サイズ・初期化
+addEventListener("keydown",e=>{
+  if($("#lb").classList.contains("on")){if(e.key==="Escape")$("#lb").classList.remove("on");else if(e.key==="ArrowRight")$("#lb .nx").click();else if(e.key==="ArrowLeft")$("#lb .pv").click();return}
+  if(e.key==="Escape"){if($("#dlg").classList.contains("on"))$("#dlg").classList.remove("on");else{setQ("");render();$("#q").blur()}}
+  else if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$("#q").focus();$("#q").select()}
+});
 let fs=+LS.get("fs",15);
 function applyFs(){fs=Math.min(22,Math.max(12,fs));document.body.style.fontSize=fs+"px";LS.set("fs",fs)}
 $("#fm").onclick=()=>{fs--;applyFs()};$("#fp").onclick=()=>{fs++;applyFs()};applyFs();
-const fit=()=>document.documentElement.style.setProperty("--hh",$("#hd").offsetHeight+"px");
+const fit=()=>document.documentElement.style.setProperty("--hh",matchMedia("(max-width:640px)").matches?"0px":$("#hd").offsetHeight+"px");
 addEventListener("resize",fit);fit();
 (function(){const h=new URLSearchParams(location.hash.slice(1));
   if(h.get("s")&&DATA[+h.get("s")])cur=+h.get("s");
-  if(h.get("q")){setQ(h.get("q"));if(h.get("m")==="sheet")mode="sheet"}})();
+  if(h.get("q"))setQ(h.get("q"));
+  if(h.get("v")==="sheet")view="sheet";})();
 render();
 </script>
 </body>
