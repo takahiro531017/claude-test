@@ -99,10 +99,18 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
   .tb-m{display:flex}
 }
 @media print{header,nav,.seg,.fl,.chips,#toast,#bar,.noprint{display:none}.wrap{border:0;overflow:visible}td{font-size:11px}main{padding:0}}
+#gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+#gf{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;max-width:340px;width:100%;text-align:center}
+#gf input{width:100%;font-size:16px;padding:10px;margin:8px 0;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+#gf button{width:100%;padding:10px;background:var(--acc);color:#fff;border-color:var(--acc)}
+#ge{color:var(--warn);min-height:1.6em;margin-top:6px;font-size:.9em}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
-<header id="hd">
+<div id="gate"><form id="gf"><h1>オークローン部品表</h1><p>社内専用です。パスワードを入力してください。</p>
+<input id="gp" type="password" autocomplete="current-password" placeholder="パスワード" autofocus><button type="submit">入る</button><div id="ge"></div></form></div>
+<div id="app" hidden><header id="hd">
   <div class="top"><h1 id="home" title="ホームへ">オークローン部品表</h1>
     <div class="tb"><button id="ph" title="定型文">定型文</button><button id="fm" title="文字を小さく">A−</button><button id="fp" title="文字を大きく">A＋</button></div></div>
   <div class="sb"><input id="q" type="search" placeholder="品番・部品名・商品名で検索（スペースでAND）" autocomplete="off"><button id="clr">クリア</button></div>
@@ -114,9 +122,8 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 <div id="toast"></div>
 <div id="lb"><button class="pv">‹</button><img alt=""><button class="nx">›</button></div>
 <div id="dlg"><div class="box"><b>定型文</b>（クリックでコピー。内容は自由に編集できます。この端末に保存されます）<div id="phl"></div><textarea id="phn" rows="2" placeholder="新しい定型文"></textarea><div style="margin-top:6px;display:flex;gap:8px"><button id="pha">追加</button><button id="phx">閉じる</button></div></div></div>
-<script>
-const DATA=/*DATA*/null;
-const IMGS=/*IMGS*/[];
+</div>
+<script type="text/plain" id="appsrc">const DATA=window.__P.d,IMGS=window.__P.i;
 const $=s=>document.querySelector(s);
 const norm=s=>s.normalize("NFKC").toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s\-_ー・]+/g,"");
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
@@ -130,8 +137,8 @@ function hl0(s,terms){
   const on=new Array(s.length).fill(false);
   for(const t of terms){let p=0;while((p=n.indexOf(t,p))>=0){for(let k=p;k<p+t.length;k++)on[map[k]]=true;p+=t.length}}
   let o="",open=false;
-  for(let i=0;i<s.length;i++){if(on[i]&&!open){o+="<mark>";open=true}if(!on[i]&&open){o+="</mark>";open=false}o+=esc(s[i])}
-  return o+(open?"</mark>":"");
+  for(let i=0;i<s.length;i++){if(on[i]&&!open){o+="<mark>";open=true}if(!on[i]&&open){o+="<\/mark>";open=false}o+=esc(s[i])}
+  return o+(open?"<\/mark>":"");
 }
 const RE=/((?<![A-Za-z0-9])(?=[A-Z0-9-]*(?:\d|KD))[A-Z][A-Z0-9-]{4,}(?![A-Za-z0-9])|MGT-[A-Z]+)|(メーカー終売|メーカー廃盤|終売|廃盤|完売|供給終了|生産終了|取り寄せ不可|取寄不可|取り寄せ出来ず|修理対応)/g;
 const BAD=/終売|廃盤|完売|供給終了|生産終了/, NG=/取り寄せ不可|取寄不可|取り寄せ出来ず|修理対応/;
@@ -139,8 +146,8 @@ function hl(s,terms){
   if(!s)return"";let o="",p=0,m;RE.lastIndex=0;
   while((m=RE.exec(s))){
     o+=hl0(s.slice(p,m.index),terms);
-    o+=m[1]?`<span class="code" data-c="${m[1]}" title="クリックでコピー">${hl0(m[1],terms)}</span>`
-           :`<span class="bd${BAD.test(m[2])?'':' ok'}">${hl0(m[2],terms)}</span>`;
+    o+=m[1]?`<span class="code" data-c="${m[1]}" title="クリックでコピー">${hl0(m[1],terms)}<\/span>`
+           :`<span class="bd${BAD.test(m[2])?'':' ok'}">${hl0(m[2],terms)}<\/span>`;
     p=m.index+m[0].length;
   }
   return o+hl0(s.slice(p),terms);
@@ -181,58 +188,58 @@ function copyText(r){
   const ttl=(r.c.map(c=>c[0]).find(v=>v&&!r.codes.includes(v))||"").split("\n")[0].slice(0,40);
   return [r.sh.name,r.codes.join(" / "),ttl,r.price?"定価"+yen(r.price):""].filter(Boolean).join("｜");
 }
-function picsHTML(r){return r.imgs.length?`<div class="pics">${r.imgs.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}</div>`:""}
+function picsHTML(r){return r.imgs.length?`<div class="pics">${r.imgs.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}<\/div>`:""}
 function cardHTML(r){
   const stl={dead:"終売・廃盤の記載あり",ng:"取り寄せ不可・修理対応の記載あり",ok:"終売・不可の記載なし"}[r.st];
   const m=memos[r.key];
   return`<div class="card st-${r.st}" data-k="${esc(r.key)}" title="${stl}">
-<div class="ch"><input type="checkbox" class="sel" ${sel.has(r.key)?"checked":""} aria-label="選択"><span class="s">${esc(r.sh.name)}</span>${r.price?`<span class="price">${yen(r.price)}</span>`:""}
-<span class="act"><button class="fav ${favs.has(r.key)?"on":""}" title="お気に入り">${favs.has(r.key)?"★":"☆"}</button><button class="cp">コピー</button><button class="mm">メモ</button></span></div>
-<div class="cells">${r.c.filter(c=>c[0]).map(c=>`<span>${hl(c[0],terms)}</span>`).join("")}</div>${picsHTML(r)}
-${m!=null?`<textarea class="memo" rows="2" placeholder="メモ">${esc(m)}</textarea>`:""}</div>`;
+<div class="ch"><input type="checkbox" class="sel" ${sel.has(r.key)?"checked":""} aria-label="選択"><span class="s">${esc(r.sh.name)}<\/span>${r.price?`<span class="price">${yen(r.price)}<\/span>`:""}
+<span class="act"><button class="fav ${favs.has(r.key)?"on":""}" title="お気に入り">${favs.has(r.key)?"★":"☆"}<\/button><button class="cp">コピー<\/button><button class="mm">メモ<\/button><\/span><\/div>
+<div class="cells">${r.c.filter(c=>c[0]).map(c=>`<span>${hl(c[0],terms)}<\/span>`).join("")}<\/div>${picsHTML(r)}
+${m!=null?`<textarea class="memo" rows="2" placeholder="メモ">${esc(m)}<\/textarea>`:""}<\/div>`;
 }
 function sheetHTML(sh){
   const body=sh.rows.map(r=>{
     if(!r.c)return"";
-    const tds=r.c.map(([v,rs,cs,_c,im])=>`<td${/^[\d,.]+$/.test(v)?` class=num`:""}${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}${im?`<div class="pics">${im.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}</div>`:""}</td>`).join("");
-    return`<tr id="r${sh.i}_${r.r}" class="${rowHit(r)?'hit':''}">${tds}</tr>`}).join("");
-  return`<h2>${esc(sh.name)}<button class="noprint" onclick="print()">印刷</button></h2><div class="wrap"><table>${body}</table></div>`;
+    const tds=r.c.map(([v,rs,cs,_c,im])=>`<td${/^[\d,.]+$/.test(v)?` class=num`:""}${rs>1?` rowspan=${rs}`:""}${cs>1?` colspan=${cs}`:""}>${hl(v,terms)}${im?`<div class="pics">${im.map(k=>`<img src="${IMGS[k]}" loading="lazy" alt="">`).join("")}<\/div>`:""}<\/td>`).join("");
+    return`<tr id="r${sh.i}_${r.r}" class="${rowHit(r)?'hit':''}">${tds}<\/tr>`}).join("");
+  return`<h2>${esc(sh.name)}<button class="noprint" onclick="print()">印刷<\/button><\/h2><div class="wrap"><table>${body}<\/table><\/div>`;
 }
 function homeHTML(){
-  return`<p class="lead">商品を選ぶか、上の検索欄に品番・部品名を入力してください。</p><div class="tiles">`+DATA.map(sh=>{
+  return`<p class="lead">商品を選ぶか、上の検索欄に品番・部品名を入力してください。<\/p><div class="tiles">`+DATA.map(sh=>{
     const coded=sh.rows.filter(r=>r.codes.length),dead=coded.filter(r=>r.dead).length;
-    return`<div class="tile" data-s="${sh.i}"><div class="im">${sh.img!=null?`<img src="${IMGS[sh.img]}" alt="">`:"<span>📦</span>"}</div><div class="tx"><b>${esc(sh.name)}</b><small>品番 ${sh.codes.size}件</small>${coded.length&&dead/coded.length>=.5?` <span class="bd">終売・廃盤が多い</span>`:""}</div></div>`}).join("")+`</div>`;
+    return`<div class="tile" data-s="${sh.i}"><div class="im">${sh.img!=null?`<img src="${IMGS[sh.img]}" alt="">`:"<span>📦<\/span>"}<\/div><div class="tx"><b>${esc(sh.name)}<\/b><small>品番 ${sh.codes.size}件<\/small>${coded.length&&dead/coded.length>=.5?` <span class="bd">終売・廃盤が多い<\/span>`:""}<\/div><\/div>`}).join("")+`<\/div>`;
 }
 function filtersHTML(){
   const per=DATA.map(sh=>[sh,results(true).filter(r=>r.sh===sh).length]).filter(x=>x[1]);
-  return`<div class="chips">${per.map(([sh,n])=>`<button data-sf="${sh.i}" class="${selSheets.has(sh.i)?"on":""}">${esc(sh.name)} ${n}</button>`).join("")}</div>
-<div class="fl"><label><input type="checkbox" id="fd" ${noDead?"checked":""}> 終売・廃盤を除く</label><label><input type="checkbox" id="fn" ${noNG?"checked":""}> 取り寄せ不可・修理対応を除く</label><label><input type="checkbox" id="fi" ${withImg?"checked":""}> 画像ありのみ</label>
-<label>並び順 <select id="so"><option value="table" ${sort==="table"?"selected":""}>表の順（品番一致を先頭）</option><option value="up" ${sort==="up"?"selected":""}>定価の安い順</option><option value="down" ${sort==="down"?"selected":""}>定価の高い順</option></select></label></div>`;
+  return`<div class="chips">${per.map(([sh,n])=>`<button data-sf="${sh.i}" class="${selSheets.has(sh.i)?"on":""}">${esc(sh.name)} ${n}<\/button>`).join("")}<\/div>
+<div class="fl"><label><input type="checkbox" id="fd" ${noDead?"checked":""}> 終売・廃盤を除く<\/label><label><input type="checkbox" id="fn" ${noNG?"checked":""}> 取り寄せ不可・修理対応を除く<\/label><label><input type="checkbox" id="fi" ${withImg?"checked":""}> 画像ありのみ<\/label>
+<label>並び順 <select id="so"><option value="table" ${sort==="table"?"selected":""}>表の順（品番一致を先頭）<\/option><option value="up" ${sort==="up"?"selected":""}>定価の安い順<\/option><option value="down" ${sort==="down"?"selected":""}>定価の高い順<\/option><\/select><\/label><\/div>`;
 }
 function listHTML(){
   const a=results(false);
-  let h=`<div class="seg"><button data-v="list" class="on">カード表示</button><button data-v="sheet">表で見る（${esc(DATA[cur].name)}）</button></div>`+filtersHTML();
-  if(!a.length)return h+'<div class="empty">見つかりませんでした。別の表記（品番の一部・ひらがな等）でもお試しください</div>';
-  h+=`<p class="cnt">${a.length}件ヒット。カードをクリックで元の表の位置へ</p><div class="res">`;
+  let h=`<div class="seg"><button data-v="list" class="on">カード表示<\/button><button data-v="sheet">表で見る（${esc(DATA[cur].name)}）<\/button><\/div>`+filtersHTML();
+  if(!a.length)return h+'<div class="empty">見つかりませんでした。別の表記（品番の一部・ひらがな等）でもお試しください<\/div>';
+  h+=`<p class="cnt">${a.length}件ヒット。カードをクリックで元の表の位置へ<\/p><div class="res">`;
   let last=null;
-  a.forEach(r=>{if(sort==="table"&&r.sh!==last){last=r.sh;h+=`<div class="gh">${esc(r.sh.name)}</div>`}h+=cardHTML(r)});
-  return h+"</div>";
+  a.forEach(r=>{if(sort==="table"&&r.sh!==last){last=r.sh;h+=`<div class="gh">${esc(r.sh.name)}<\/div>`}h+=cardHTML(r)});
+  return h+"<\/div>";
 }
 function favHTML(){
   const a=[...favs].map(k=>BYKEY[k]).filter(Boolean);
-  return a.length?`<p class="cnt">お気に入り ${a.length}件（この端末に保存）</p><div class="res">${a.map(cardHTML).join("")}</div>`:'<div class="empty">カードの ☆ を押すとここに登録されます</div>';
+  return a.length?`<p class="cnt">お気に入り ${a.length}件（この端末に保存）<\/p><div class="res">${a.map(cardHTML).join("")}<\/div>`:'<div class="empty">カードの ☆ を押すとここに登録されます<\/div>';
 }
 function renderNav(){
   const counts=terms.length?results(true):[];
-  $("#nav").innerHTML=`<button data-nv="home" class="${view==="home"?"on":""}">ホーム</button><button data-nv="fav" class="${view==="fav"?"on":""}">★お気に入り${favs.size?`<span class="n">${favs.size}</span>`:""}</button>`+
-    DATA.map(sh=>{const h=counts.filter(r=>r.sh===sh).length;return`<button data-i="${sh.i}" class="${view==="sheet"&&sh.i===cur?"on":""}">${esc(sh.name)}${h?`<span class="n">${h}</span>`:""}</button>`}).join("");
+  $("#nav").innerHTML=`<button data-nv="home" class="${view==="home"?"on":""}">ホーム<\/button><button data-nv="fav" class="${view==="fav"?"on":""}">★お気に入り${favs.size?`<span class="n">${favs.size}<\/span>`:""}<\/button>`+
+    DATA.map(sh=>{const h=counts.filter(r=>r.sh===sh).length;return`<button data-i="${sh.i}" class="${view==="sheet"&&sh.i===cur?"on":""}">${esc(sh.name)}${h?`<span class="n">${h}<\/span>`:""}<\/button>`}).join("");
 }
 function render(scrollTo){
   const m=$("#main");
   if(view==="home")m.innerHTML=homeHTML();
   else if(view==="fav")m.innerHTML=favHTML();
   else if(view==="list")m.innerHTML=listHTML();
-  else m.innerHTML=(terms.length?`<div class="seg"><button data-v="list">カード表示</button><button data-v="sheet" class="on">表で見る（${esc(DATA[cur].name)}）</button></div>`:"")+sheetHTML(DATA[cur]);
+  else m.innerHTML=(terms.length?`<div class="seg"><button data-v="list">カード表示<\/button><button data-v="sheet" class="on">表で見る（${esc(DATA[cur].name)}）<\/button><\/div>`:"")+sheetHTML(DATA[cur]);
   renderNav();renderBar();saveHash();
   if(scrollTo){const e=document.getElementById(scrollTo);if(e)e.scrollIntoView({block:"center"})}
 }
@@ -279,7 +286,7 @@ $("#barcp").onclick=()=>copy([...sel].map(k=>copyText(BYKEY[k])).join("\n"),sel.
 // ---- 定型文
 const DEF_PH=["こちらの部品は、メーカーへお客様から直接ご注文をお願いしております。フリーダイヤル 0120-096-013 までご連絡ください。（内容は編集してください）"];
 let phs=J.get("phrases",DEF_PH);
-function renderPh(){$("#phl").innerHTML=phs.map((p,i)=>`<div class="ph"><p>${esc(p)}</p><button data-c="${i}">コピー</button><button data-d="${i}">削除</button></div>`).join("")||"<p>まだありません</p>"}
+function renderPh(){$("#phl").innerHTML=phs.map((p,i)=>`<div class="ph"><p>${esc(p)}<\/p><button data-c="${i}">コピー<\/button><button data-d="${i}">削除<\/button><\/div>`).join("")||"<p>まだありません<\/p>"}
 $("#ph").onclick=()=>{renderPh();$("#dlg").classList.add("on")};
 $("#phx").onclick=()=>$("#dlg").classList.remove("on");
 $("#pha").onclick=()=>{const v=$("#phn").value.trim();if(!v)return;phs.push(v);J.set("phrases",phs);$("#phn").value="";renderPh()};
@@ -300,6 +307,25 @@ addEventListener("resize",fit);fit();
   if(h.get("q"))setQ(h.get("q"));
   if(h.get("v")==="sheet")view="sheet";})();
 render();
+</script>
+<script>
+const ENC=/*ENC*/null;
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function unlock(pw){
+  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+  const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt:b64(ENC.salt),iterations:ENC.iter,hash:"SHA-256"},km,{name:"AES-GCM",length:256},false,["decrypt"]);
+  const buf=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64(ENC.iv)},key,b64(ENC.data));
+  window.__P=JSON.parse(new TextDecoder().decode(buf));
+}
+async function enter(pw,silent){
+  const err=document.getElementById("ge");
+  try{await unlock(pw)}catch(e){if(!silent)err.textContent=window.crypto&&crypto.subtle?"パスワードが違います":"このブラウザ/開き方では利用できません（https か最新のブラウザでお試しください）";return false}
+  try{sessionStorage.setItem("pw",pw)}catch(e){}
+  document.getElementById("gate").remove();document.getElementById("app").hidden=false;
+  const s=document.createElement("script");s.text=document.getElementById("appsrc").textContent;document.body.appendChild(s);return true;
+}
+document.getElementById("gf").onsubmit=e=>{e.preventDefault();enter(document.getElementById("gp").value)};
+try{const p=sessionStorage.getItem("pw");if(p)enter(p,true)}catch(e){}
 </script>
 </body>
 </html>

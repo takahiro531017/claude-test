@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""オークローン部品表(xlsx) -> index.html (データ埋め込み)。 usage: build.py parts.xlsx"""
+"""オークローン部品表(xlsx) -> index.html (データ埋め込み)。 usage: PARTS_PASSWORD=... build.py parts.xlsx"""
 import sys, json, base64, os, unicodedata, openpyxl
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from imgs import extract
@@ -78,8 +78,19 @@ for ws in wb:
             continue
         keep.append(row)
     sheets.append({"name": nf(ws.title).strip(), "rows": [{"r": k["r"], "c": k["c"]} for k in keep]})
-tpl = open(__file__.replace("build.py", "template.html"), encoding="utf-8").read()
-out = tpl.replace("/*DATA*/null", json.dumps(sheets, ensure_ascii=False, separators=(",", ":")))
-out = out.replace("/*IMGS*/[]", json.dumps(images, separators=(",", ":")))
-open(__file__.replace("build.py", "index.html"), "w", encoding="utf-8").write(out)
-print(len(sheets), "sheets")
+# 暗号化 (パスワードは環境変数 PARTS_PASSWORD で渡す。リポジトリには保存しない)
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+pw = os.environ.get("PARTS_PASSWORD")
+if not pw: sys.exit("PARTS_PASSWORD を環境変数で指定してください")
+ITER = 600000
+salt, iv = os.urandom(16), os.urandom(12)
+key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITER).derive(pw.encode())
+payload = json.dumps({"d": sheets, "i": images}, ensure_ascii=False, separators=(",", ":")).encode()
+enc = {"salt": base64.b64encode(salt).decode(), "iv": base64.b64encode(iv).decode(), "iter": ITER,
+       "data": base64.b64encode(AESGCM(key).encrypt(iv, payload, None)).decode()}
+tpl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "template.html"), encoding="utf-8").read()
+out = tpl.replace("/*ENC*/null", json.dumps(enc))
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html"), "w", encoding="utf-8").write(out)
+print(len(sheets), "sheets, encrypted")
