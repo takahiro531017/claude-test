@@ -38,6 +38,25 @@ profiles:
       row_tol: 6.0
       min_size_headers: 6
 
+  # 行=サイズ・列=地帯の転置レイアウト。地帯名・日付が字間をあけて配置されるため word_x_tol を広げる。
+  # 発地ラベルが無い場合はファイル名から補完される（取込後に画面で修正可）。
+  - name: transposed
+    orientation: transposed
+    word_x_tol: 12
+    header_gap: 40          # これ以上離れた語は別項目として扱う（左右に別項目が並ぶ帳票向け）
+    header_fields:
+      valid_from: [運賃適用期日, 適用期日]
+      valid_to: [運賃満期日, 満期日]
+      origin: [発地]
+      customer_code: [顧客コード, お客様コード]
+      quote_no: [見積No., 見積No, 見積番号]
+      payment_terms: [支払条件]
+      closing_day: [締日]
+    matrix:
+      line_tol: 3.5
+      row_tol: 4.0
+      min_size_headers: 6  # 地帯名が読めた列数の下限
+
 notes:
   # 注記として扱わない行（ページ番号など）
   ignore_patterns: ['^(Page|ページ)\s*\d+', '^\d+\s*/\s*\d+$']

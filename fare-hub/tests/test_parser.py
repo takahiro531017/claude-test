@@ -58,3 +58,25 @@ def test_garbage_is_rejected_with_kind_only(st):
         if kind:
             assert e.value.kind == kind
         assert "broken" not in e.value.kind
+
+
+def test_transposed_layout_with_letter_spaced_text(st):
+    """行=サイズ・列=地帯／字間をあけた地帯名・日付／発地ラベル無し。"""
+    sp = Spec("拠点D", layout="transposed", seed=4)
+    res = parse_pdf(build_pdf(sp), st)
+    assert res.profile == "transposed"
+    assert res.rates == make_rates(sp)
+    assert (res.header["valid_from"], res.header["valid_to"]) == ("2025-04-01", "2026-03-31")
+    assert res.weights == {60: 2, 80: 5, 100: 10, 140: 20, 160: 30, 170: 50}
+    assert [c for c, _ in res.notes] == ["okinawa", "island", "insurance", "volume", "limit"]
+    assert {"kind": "header_missing", "detail": "origin"} in res.warnings
+
+
+def test_transposed_missing_cell_detected(st):
+    sp = Spec("拠点D", layout="transposed", seed=4, missing=[("関東", 100)])
+    assert ("関東", 100) not in parse_pdf(build_pdf(sp), st).rates
+
+
+def test_four_digit_prices_without_comma():
+    from app.parser import PRICE_RE
+    assert PRICE_RE.match("1234") and PRICE_RE.match("1,234") and PRICE_RE.match("¥1,234円") and not PRICE_RE.match("12kg")

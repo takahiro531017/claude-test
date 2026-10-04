@@ -34,7 +34,7 @@ class Spec:
     origin: str
     valid_from: str = "2025年4月1日"
     valid_to: str = "2026年3月31日"
-    layout: str = "standard"  # standard | alt
+    layout: str = "standard"  # standard | alt | transposed
     seed: int = 1
     missing: list[tuple[str, int]] = field(default_factory=list)  # 空欄にするセル
     dashed: list[tuple[str, int]] = field(default_factory=list)  # 「-」にするセル
@@ -49,7 +49,50 @@ def make_rates(spec: Spec) -> dict[tuple[str, int], int]:
     return {(r, s): rnd.randint(100, 999) for r in st.region_names for s in st.sizes}
 
 
+def _spaced(items: list, x: float, y: float, text: str, size: float, pitch: float) -> None:
+    """1文字ずつ離して配置（字間あきの帳票を再現）。"""
+    for i, ch in enumerate(text):
+        items.append((x + i * pitch, y, ch, size))
+
+
+def _draw_transposed(c: canvas.Canvas, spec: Spec, rates: dict[tuple[str, int], int]) -> None:
+    """行=サイズ・列=地帯。地帯名・日付は字間をあけ、発地ラベルは無い（ヘッダー右上に日付）。"""
+    st = load_settings()
+    items: list[tuple[float, float, str, float]] = []
+    items.append((642, 545, "運賃適用期日：", 9))
+    _spaced(items, 712, 545, spec.valid_from, 9, 8.5)
+    items.append((642, 532, "運賃満期日：", 9))
+    _spaced(items, 712, 532, spec.valid_to, 9, 8.5)
+    items.append((40, 520, "支払条件", 9))
+    items.append((95, 520, "月末締め翌月末払い", 9))
+    items.append((560, 505, "見積No.", 9))
+    items.append((600, 505, spec.quote_no, 9))
+    x0, step, header_y, row_y0, row_dy = 181.0, 54.0, 470.0, 400.0, 10.0
+    for ri, region in enumerate(st.region_names):
+        x = x0 + ri * step - 4
+        _spaced(items, x + (12 if len(region) == 2 else 0), header_y, region, 9, 15)
+    items.append((27, 440, "サイズ", 8))
+    items.append((110, 440, "重量(kg)", 8))
+    for si, size in enumerate(st.sizes):
+        y = row_y0 - si * row_dy
+        items.append((36, y, str(size), 8))
+        if size in st.weight_sizes:
+            items.append((126, y, f"{st.weight_sizes[size]}kg以内", 8))
+        for ri, region in enumerate(st.region_names):
+            if (region, size) not in spec.missing:
+                items.append((x0 + ri * step, y, str(rates[(region, size)]), 8))
+    ny = row_y0 - len(st.sizes) * row_dy - 14
+    for i, n in enumerate(spec.notes):
+        items.append((20, ny - 12 * i, n, 8))
+    random.Random(spec.seed + 99).shuffle(items)
+    for x, y, text, size in items:
+        c.setFont(FONT, size)
+        c.drawString(x, y, text)
+
+
 def _draw(c: canvas.Canvas, spec: Spec, rates: dict[tuple[str, int], int]) -> None:
+    if spec.layout == "transposed":
+        return _draw_transposed(c, spec, rates)
     st = load_settings()
     alt = spec.layout == "alt"
     rnd = random.Random(spec.seed + 99)
@@ -154,10 +197,14 @@ def default_specs() -> list[Spec]:
     ]
 
 
+def transposed_spec() -> Spec:
+    return Spec("拠点D", layout="transposed", seed=4, valid_from="2025年4月1日", valid_to="2026年3月31日")
+
+
 def main() -> None:
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "data/dummy")
     out.mkdir(parents=True, exist_ok=True)
-    for sp in default_specs():
+    for sp in [*default_specs(), transposed_spec()]:
         p = out / f"dummy_{sp.origin}.pdf"
         build_pdf(sp, p)
         print("wrote", p)
