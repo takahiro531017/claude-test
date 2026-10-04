@@ -1,0 +1,97 @@
+{# 画面(部分表示)とレポート(全体)で共通のテンプレート。マクロ単位で部品化している。 #}
+{% macro terms(a, names) %}
+<div class="terms"><b>📖 この数字の言葉</b>
+  <ul>{% for n in names %}<li><b>{{ n }}</b> → {{ a.glossary_map[n] }}</li>{% endfor %}</ul></div>
+{% endmacro %}
+
+{% macro cell(c) %}<td class="{{ c.cls }}">{{ c.text }}<small>{{ c.ref_name }}: {{ c.ref }}</small></td>{% endmacro %}
+
+{% macro summary(a) %}
+<section class="card">
+  <h2>今回のまとめ(3行)</h2>
+  <ol class="big">{% for s in a.summary %}<li>{{ s }}</li>{% endfor %}</ol>
+</section>
+{% endmacro %}
+
+{% macro changes(a) %}
+<section class="card">
+  <h2>数字の変化</h2>
+  <p class="note">矢印の見方: <span class="up">↑ 増えた</span> / <span class="down">↓ 減った</span> / <span class="flat">→ ほぼ同じ(±2%以内)</span> / <span class="nodata">– データなし</span>
+  　※「ポイント(pt)」→ 割合どうしの差(3.0%→3.5%なら+0.5pt)</p>
+  <div class="scroll"><table>
+    <tr><th>項目</th><th>今回</th>{% for n in a.ref_names %}<th>{{ n }}と比べて<small>{{ a.ref_periods[loop.index0] }}</small></th>{% endfor %}</tr>
+    {% for r in a.changes %}<tr><th class="l">{{ r.label }}<small>→ {{ r.short }}</small></th><td class="cur">{{ r.current }}</td>
+      {% for c in r.cells %}{{ cell(c) }}{% endfor %}</tr>{% endfor %}
+  </table></div>
+</section>
+{% endmacro %}
+
+{% macro posts(a) %}
+<section class="card">
+  <h2>よく見られた投稿ベスト3 / 反応が少なかった投稿ワースト3</h2>
+  <p class="note">反応の多さは「エンゲージメント率 → 見た人のうち、いいね・コメント・保存などの反応をした人の割合」で比べています。理由は数字から考えた<b>仮説</b>で、断定ではありません。</p>
+  {% if not a.posts.ok %}<p class="nodata">{{ a.posts.note }}</p>{% else %}
+  <h3>👍 ベスト3</h3>
+  {% for p in a.posts.top %}<div class="post good"><b>{{ loop.index }}位</b> {{ p.date }} ／ {{ p.type }} ／ {{ p.theme or 'テーマなし' }}<br>
+    反応の割合 {{ p.rate }}・リーチ(見た人) {{ p.reach }}・いいね {{ p.likes }}・保存 {{ p.saves }}<p class="why">💡 理由の仮説: {{ p.why }}</p></div>{% endfor %}
+  <h3>👎 ワースト3</h3>
+  {% for p in a.posts.worst %}<div class="post bad"><b>{{ loop.index }}</b> {{ p.date }} ／ {{ p.type }} ／ {{ p.theme or 'テーマなし' }}<br>
+    反応の割合 {{ p.rate }}・リーチ(見た人) {{ p.reach }}・いいね {{ p.likes }}・保存 {{ p.saves }}<p class="why">💡 理由の仮説: {{ p.why }}</p></div>
+  {% else %}<p class="nodata">投稿が少ないため、ワーストは{{ 'データなし' }}です。</p>{% endfor %}
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro breakdowns(a) %}
+<section class="card">
+  <h2>投稿の種類別・曜日別・時間帯別の比較</h2>
+  <p class="note">本数が少ないグループは、たまたまの結果かもしれません。参考として見てください。</p>
+  {% for b in a.breakdowns %}<h3>{{ b.title }}</h3>
+    {% if not b.ok %}<p class="nodata">{{ b.note }}</p>{% else %}
+    <div class="grid2"><div><h4>反応の割合(エンゲージメント率)</h4>{{ b.rate_svg|safe }}</div>
+    <div><h4>見た人の数(平均リーチ)</h4>{{ b.reach_svg|safe }}</div></div>
+    <p class="comment">{{ b.comment }}</p>{% endif %}{% endfor %}
+</section>
+{% endmacro %}
+
+{% macro follower(a) %}
+<section class="card"><h2>フォロワー数の推移</h2>{{ a.follower_chart.svg|safe }}<p class="comment">{{ a.follower_chart.comment }}</p></section>
+{% endmacro %}
+
+{% macro deep(a, d) %}
+<section class="card page">
+  <h2>{{ d.icon }} 深掘り: {{ d.title }}</h2>
+  {{ terms(a, d.terms) }}
+  {% for r in d.reading %}<p class="big">{{ r }}</p>{% endfor %}
+  {% for c in d.charts %}<h3>{{ c.title }}</h3>{{ c.svg|safe }}<p class="comment">{{ c.comment }}</p>{% endfor %}
+  <h3>💡 考えられる理由(仮説)</h3><ul>{% for h in d.hypotheses %}<li>{{ h }}</li>{% endfor %}</ul>
+</section>
+{% endmacro %}
+
+{% macro suggestions(a) %}
+<section class="card page">
+  <h2>次にやること(改善提案)</h2>
+  {% for s in a.suggestions %}<div class="sug"><b>{{ loop.index }}. {{ s.title }}</b>
+    <p><span class="tag">なぜ</span> {{ s.why }}</p><p><span class="tag">どうやる</span> {{ s.how }}</p></div>{% endfor %}
+  {% if a.memo.prev_next or a.memo.cur_decided %}<h3>📝 会議メモ({{ a.memo.cur_date }})</h3>
+    <p><b>決まったこと:</b> {{ a.memo.cur_decided or 'なし' }}</p><p><b>次にやること:</b> {{ a.memo.prev_next or 'なし' }}</p>{% endif %}
+</section>
+{% endmacro %}
+
+{% macro glossary(a) %}
+<section class="card page"><h2>用語集</h2>
+  <div class="scroll"><table class="gl"><tr><th>用語</th><th>→ 意味</th><th>→ 数字の見方(良い目安)</th></tr>
+  {% for g in a.glossary %}<tr><th class="l">{{ g.term }}</th><td>→ {{ g.meaning }}</td><td>{{ g.guide }}</td></tr>{% endfor %}</table></div>
+</section>
+{% endmacro %}
+
+{% macro full(a, css) %}<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ a.client }} SNS分析レポート {{ a.period_label }}</title><style>{{ css|safe }}</style></head>
+<body><main>
+<header class="cover"><h1>SNS分析レポート</h1>
+  <p>{{ a.client }} ／ Instagram ／ @{{ a.account }}</p><p>対象期間: {{ a.period }}　作成日: {{ a.created }}</p></header>
+{{ summary(a) }}{{ changes(a) }}{{ posts(a) }}{{ breakdowns(a) }}{{ follower(a) }}
+{% for d in a.deep %}{{ deep(a, d) }}{% endfor %}
+{{ suggestions(a) }}{{ glossary(a) }}
+</main></body></html>{% endmacro %}
