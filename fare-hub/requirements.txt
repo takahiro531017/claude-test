@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pdfplumber
+openpyxl
+python-multipart
+PyYAML
+# dev / test
+pytest
+httpx
+reportlab

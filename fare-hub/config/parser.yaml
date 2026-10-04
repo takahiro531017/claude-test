@@ -1,0 +1,52 @@
+# パーサー設定。拠点ごとのレイアウト差異はここで調整する（コード変更不要）。
+# 複数 profile を定義すると、全 profile で解析して最も完全な結果を採用する。
+
+limits:
+  max_file_mb: 30
+  max_pages: 20
+
+# 有効期限が近いとみなす日数
+expiring_soon_days: 30
+
+profiles:
+  - name: standard
+    # ヘッダー項目: 項目名 -> PDF上のラベル候補（空白は無視して照合）
+    header_fields:
+      valid_from: [運賃適用期日, 適用期日]
+      valid_to: [運賃満期日, 満期日]
+      origin: [発地]
+      customer_code: [顧客コード]
+      quote_no: [見積No., 見積No, 見積番号]
+      payment_terms: [支払条件]
+      closing_day: [締日]
+    matrix:
+      line_tol: 3.5        # 同一行とみなす縦座標の許容差(pt)
+      row_tol: 4.0         # 価格セルを地帯ラベル行に割り当てる許容差(pt)
+      min_size_headers: 6  # サイズ見出し行とみなす最小サイズ数
+
+  - name: branch_alt
+    header_fields:
+      valid_from: [適用開始日, 適用期日]
+      valid_to: [有効期限, 満期日]
+      origin: [出荷元, 発地拠点, 発地]
+      customer_code: [お客様コード, 顧客コード]
+      quote_no: [見積番号, 見積No.]
+      payment_terms: [お支払条件, 支払条件]
+      closing_day: [締め日, 締日]
+    matrix:
+      line_tol: 4.5
+      row_tol: 6.0
+      min_size_headers: 6
+
+notes:
+  # 注記として扱わない行（ページ番号など）
+  ignore_patterns: ['^(Page|ページ)\s*\d+', '^\d+\s*/\s*\d+$']
+  # 注記見出し（見出しのみの行は捨てる）
+  headings: [注記, 備考, 【注記】, 【備考】]
+  # 分類キーワード（上から順に最初に一致したカテゴリ）
+  categories:
+    - {key: okinawa, label: 沖縄, keywords: [沖縄]}
+    - {key: island, label: 離島, keywords: [離島, 中継]}
+    - {key: insurance, label: 保険, keywords: [保険]}
+    - {key: volume, label: 出荷前提, keywords: [個数, 出荷見込, 見直し]}
+    - {key: limit, label: サイズ・重量上限, keywords: [上限, 以内, 制限]}

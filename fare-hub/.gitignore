@@ -1,0 +1,14 @@
+# 機密保持: 実データ・取込結果・DB・出力はGit管理外
+data/
+uploads/
+exports/
+*.pdf
+*.sqlite
+*.sqlite3
+*.db
+*.xlsx
+*.xls
+__pycache__/
+.pytest_cache/
+.venv/
+.env

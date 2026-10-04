@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>運賃表ハブ（ローカル）</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>運賃表ハブ</h1>
+  <span class="badge local">ローカル動作・外部通信なし</span>
+  <nav id="tabs">
+    <button data-tab="import" class="active">取込</button>
+    <button data-tab="search">検索・比較</button>
+    <button data-tab="matrix">拠点別マトリクス</button>
+    <button data-tab="combined">統合ビュー</button>
+    <button data-tab="notes">注記</button>
+    <button data-tab="export">出力</button>
+  </nav>
+</header>
+<main>
+  <section id="tab-import">
+    <div id="drop" tabindex="0">PDFをここにドラッグ&amp;ドロップ（複数可） / クリックして選択
+      <input id="file" type="file" accept="application/pdf,.pdf" multiple hidden></div>
+    <div id="import-results"></div>
+    <h2>取込済みの運賃表</h2>
+    <div id="tariff-list"></div>
+  </section>
+  <section id="tab-search" hidden>
+    <form id="search-form" class="row">
+      <label>発地 <select id="s-origin"></select></label>
+      <label>着地（地帯 / 都道府県） <input id="s-dest" list="dest-list" placeholder="例: 関東 / 東京 / 大阪府" required></label>
+      <datalist id="dest-list"></datalist>
+      <label>サイズ <select id="s-size"></select></label>
+      <button>検索</button>
+    </form>
+    <div id="search-out"></div>
+  </section>
+  <section id="tab-matrix" hidden>
+    <div class="row"><label>運賃表 <select id="m-select"></select></label></div>
+    <div id="matrix-out"></div>
+  </section>
+  <section id="tab-combined" hidden>
+    <div class="row"><label>サイズ <select id="c-size"></select></label>
+      <span class="muted">※期限切れ・適用前は最安判定の対象外（灰色）</span></div>
+    <div id="combined-out"></div>
+  </section>
+  <section id="tab-notes" hidden><div id="notes-out"></div></section>
+  <section id="tab-export" hidden>
+    <p>現在有効な運賃表（拠点ごとに1件）を統合して出力します。サーバー側にファイルは残りません。</p>
+    <p><a class="btn" href="/api/export.xlsx" download>Excel (.xlsx)</a>
+       <a class="btn" href="/api/export.csv" download>CSV (UTF-8 BOM付き)</a></p>
+    <p class="muted">出力ファイルは社外秘です。保管・共有は社内ルールに従い、Gitにコミットしないでください。</p>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

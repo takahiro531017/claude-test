@@ -1,0 +1,19 @@
+# --- 機密保持（運賃表は社外秘）: 実データは絶対にコミットしない ---
+/data/
+/uploads/
+/exports/
+*.pdf
+*.sqlite
+*.sqlite3
+*.db
+*.xlsx
+*.xls
+*.csv.bak
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.env
