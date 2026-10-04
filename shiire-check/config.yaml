@@ -1,0 +1,49 @@
+# 仕入伝票チェックツール 設定ファイル
+# このファイルはexeと同じフォルダ（または作業フォルダ）に置いてください。
+# 書かなかった項目は初期値が使われます。
+
+# ---- AI（Anthropic API）----
+model: claude-sonnet-5-5      # 使用モデル
+max_tokens: 1024
+api_timeout_sec: 60
+api_max_retries: 2            # 通信障害時の自動再試行回数
+workers: 4                    # 同時に読み取る枚数
+
+# APIキーは環境変数 ANTHROPIC_API_KEY に設定するのが推奨です。
+# どうしても設定ファイルで指定する場合のみ、次のどちらかを使います（コードには書きません）。
+api_key: ""                   # キーを直接書く（非推奨。このファイルを共有しないこと）
+api_key_file: ""              # キーだけを書いたテキストファイルのパス
+
+# ---- 画像の前処理 ----
+image:
+  max_long_edge: 1568         # 送信前に長辺をこのpxまで縮小（EXIFの向きも補正）
+  jpeg_quality: 85
+  pdf_dpi: 200                # PDFを画像化する解像度
+  max_pdf_pages: 200
+
+scan:
+  recursive: false            # trueにすると伝票フォルダのサブフォルダも読む
+
+# ---- 伝票番号の正規化（比較時のみ。元の表記は変えません）----
+normalize:
+  nfkc: true                  # 全角→半角など（ＡＢＣ１２３ → ABC123）
+  uppercase: true             # 大文字小文字を区別しない
+  remove_whitespace: true     # スペース（全角含む）を無視
+  remove_chars: ["-", "‐", "‑", "‒", "–", "—", "―", "−", "ー", "_", ".", "/", "#", "・"]   # ハイフン等を無視
+  strip_leading_zeros: true   # 先頭ゼロを無視（004567 = 4567, TK00123 = TK123）
+  strip_prefixes: []          # 無視する接頭辞。例: ["NO", "№"]
+
+# ---- 照合 ----
+matching:
+  min_confidence: medium      # これより自信度が低いものは「要確認」（low / medium / high）
+  review_if_handwritten: true # 手書きは必ず「要確認」
+  multi_candidate_policy: prefer_ledger   # prefer_ledger: 候補が複数でも仕入一覧に存在する候補が1つだけなら一致（備考に注記）
+                                          # review: 候補が複数なら常に「要確認」
+  amount_tolerance: 0         # 金額の許容差（円）
+  date_tolerance_days: 0      # 日付の許容差（日）
+
+# ---- 保存先 ----
+data_dir: ""                  # キャッシュ・ログの保存先。空なら %LOCALAPPDATA%\ShiireCheck
+
+mock:
+  readings_file: _mock_readings.json   # モード「テスト用（AIを使わない）」で読む定義ファイル名（伝票フォルダ内）
