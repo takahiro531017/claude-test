@@ -1,34 +1,28 @@
 """SNS運用代行 分析アプリ(Instagram)。起動: streamlit run app.py"""
 import os
-from datetime import date, datetime, time
+from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from snsapp import analysis, db, importer, report, sample_data
+from snsapp import analysis, db, importer, report
 from snsapp import charts as ch
-from snsapp.db import POST_NUM, POST_TYPES, SNAP_NUM, diff_edits
+from snsapp.db import DAILY_FIELDS, diff_edits
 from snsapp.glossary import GLOSSARY
 
 st.set_page_config(page_title="SNS分析アプリ", page_icon="📊", layout="wide")
-sample_data.seed_if_empty()
-
-NUM_LABELS = {"followers": "フォロワー数", "impressions": "インプレッション", "reach": "リーチ", "likes": "いいね", "comments": "コメント",
-              "saves": "保存", "shares": "シェア", "profile_visits": "プロフィールアクセス", "link_clicks": "リンククリック"}
-NUM_HELP = {"followers": "フォローしている人の数", "impressions": "画面に表示された回数(見られた回数)", "reach": "投稿を見た「人」の数",
-            "likes": "いいねの回数", "comments": "コメントの数", "saves": "保存された回数", "shares": "シェアされた回数",
-            "profile_visits": "プロフィールを開いた回数", "link_clicks": "プロフィールのリンクを押した回数"}
-EXAMPLES = {"followers": "例: 12500", "impressions": "例: 69885", "reach": "例: 33678", "likes": "例: 2052", "comments": "例: 162",
-            "saves": "例: 738", "shares": "例: 298", "profile_visits": "例: 1030", "link_clicks": "例: 168"}
-REQUIRED_SNAP = ["followers", "impressions", "reach"]
-REQUIRED_POST = ["reach"]
+db.init_db()
+SAMPLE_DIR = Path(__file__).parent / "sample"
+COUNT_FIELDS = [f for f in DAILY_FIELDS if f[0].startswith("posts_")]
+NUM_FIELDS = [f for f in DAILY_FIELDS if not f[0].startswith("posts_")]
 
 
 def show(html: str):
     st.html(html)
 
 
-def parse_num(text, label, required):
+def parse_num(text, label, required=False, allow_negative=False):
     """入力欄の文字を数字にする。(値, エラー文)。空欄は「データなし」として保存。"""
     s = (text or "").strip().replace(",", "").replace("、", "")
     if not s:
@@ -37,31 +31,51 @@ def parse_num(text, label, required):
         v = float(s)
     except ValueError:
         return None, f"「{label}」は数字で入力してください(例: 1250)。"
-    if v < 0:
+    if v < 0 and not allow_negative:
         return None, f"「{label}」にマイナスの数字は入れられません。"
     return v, None
 
 
-def number_inputs(keys, required, prefix):
-    vals, errs = {}, []
-    cols = st.columns(3)
-    for i, k in enumerate(keys):
-        with cols[i % 3]:
-            lab = NUM_LABELS[k] + (" *" if k in required else "")
-            txt = st.text_input(lab, key=f"{prefix}_{k}", placeholder=EXAMPLES[k], help="→ " + NUM_HELP[k])
-        vals[k], e = parse_num(txt, NUM_LABELS[k], k in required)
-        if e:
-            errs.append(e)
-    return vals, errs
+def load_files(client_id, items, overwrite=False):
+    """[(ファイル名, bytes)] をまとめて取り込む。結果の文章のリストを返す。"""
+    out = []
+    for name, raw in items:
+        p = importer.plan_file(name, raw)
+        if p["error"]:
+            out.append(f"{name}: {p['error']}")
+            continue
+        acc = p["account"] or ""
+        out.append(f"{name}({importer.KIND_LABEL[p['kind']]}): " + importer.import_plan(db, client_id, p, acc, p["kind"], p["start"], p["end"], overwrite))
+    return out
 
 
-# ------------------------------------------------------------ サイドバー
-db_clients = db.clients_df()
+# ------------------------------------------------------------ クライアント選択
+clients = db.clients_df()
+if clients.empty:
+    st.title("📊 SNS分析アプリ")
+    st.info("まだデータがありません。最初にクライアント名を決めて、データを入れましょう。")
+    nm = st.text_input("クライアント名(会社名)", placeholder="例: 株式会社サンプル")
+    c1, c2 = st.columns(2)
+    if c1.button("クライアントをつくる", type="primary") and nm.strip():
+        db.add_client(nm)
+        st.rerun()
+    samples = sorted(SAMPLE_DIR.glob("*.xlsx"))
+    if samples:
+        st.write("または、`sample/` フォルダのインサイトのファイル(Instagram 2026年9月分)を読み込んで、すぐに試せます。")
+        if c2.button("サンプルのファイルを読み込む"):
+            cid = db.get_or_add_client("venusisbeauty")
+            for line in load_files(cid, [(f.name, f.read_bytes()) for f in samples]):
+                st.write("・" + line)
+            st.rerun()
+    st.stop()
+
+PAGES = ["🏠 ホーム(まとめ)", "➕ 新しいデータを追加", "🛠 データの確認・修正・削除", "🔎 深掘り:フォロワー", "🔎 深掘り:反応(エンゲージメント率)",
+         "🔎 深掘り:リーチ・インプレッション", "🔎 深掘り:プロフィール・リンク", "🔎 深掘り:フォロワーの属性", "🖼 投稿した日の分析",
+         "⏪ 過去との比較", "📄 分析ファイルを作る", "📖 用語集", "❓ 使い方"]
 with st.sidebar:
     st.title("📊 SNS分析アプリ")
-    names = db_clients["name"].tolist()
-    client_name = st.selectbox("クライアント", names)
-    client_id = int(db_clients.loc[db_clients["name"] == client_name, "id"].iloc[0])
+    client_name = st.selectbox("クライアント", clients["name"].tolist())
+    client_id = int(clients.loc[clients["name"] == client_name, "id"].iloc[0])
     with st.expander("＋ クライアントを追加"):
         nn = st.text_input("会社名(新規)", key="new_client")
         if st.button("追加する") and nn.strip():
@@ -70,156 +84,136 @@ with st.sidebar:
                 st.rerun()
             except Exception:
                 st.error("同じ名前のクライアントが既にあります。")
-    snaps_raw = db.snapshots_df(client_id)
-    accounts = sorted(snaps_raw["account"].unique().tolist()) if len(snaps_raw) else []
+    daily_all = db.daily_df(client_id)
+    accounts = sorted(daily_all["account"].unique().tolist()) if len(daily_all) else []
     account = st.selectbox("アカウント", accounts) if accounts else ""
     cur_id = None
     if account:
-        sa = snaps_raw[snaps_raw["account"] == account].sort_values("period_end")
-        opts = {f"{r.period_start}〜{r.period_end}": int(r.id) for r in sa.itertuples()}
-        pick = st.selectbox("今回の期間", list(opts)[::-1])
-        cur_id = opts[pick]
-    PAGES = ["🏠 ホーム(まとめ)", "➕ 新しいデータを追加", "🛠 データの確認・修正・削除", "🔎 深掘り:フォロワー", "🔎 深掘り:反応(エンゲージメント率)",
-             "🔎 深掘り:リーチ・インプレッション", "🔎 深掘り:プロフィール・リンク", "🖼 投稿の分析", "⏪ 過去との比較", "📄 分析ファイルを作る", "📖 用語集", "❓ 使い方"]
+        months = sorted(pd.to_datetime(daily_all.loc[daily_all["account"] == account, "date"]).dt.strftime("%Y-%m").unique(), reverse=True)
+        cur_id = st.selectbox("今回の月", months, format_func=lambda k: f"{k[:4]}年{int(k[5:])}月")
     page = st.radio("メニュー", PAGES)
-    st.caption("サンプルは架空のデータです。" if db_clients.loc[db_clients["name"] == client_name, "is_sample"].iloc[0] else "")
 
 
-def get_analysis():
+@st.cache_data(show_spinner=False)
+def _build(client_id_, client_name_, account_, cur_id_, fingerprint):
+    return analysis.build_analysis(client_name_, db.daily_df(client_id_, account_), db.demographics_df(client_id_, account_),
+                                   db.meetings_df(client_id_), cur_id_, account_)
+
+
+NEEDS_DATA = page in PAGES[:1] + PAGES[3:11]
+A = None
+if NEEDS_DATA:
     if not account:
-        return None
-    return analysis.build_analysis(client_name, snaps_raw[snaps_raw["account"] == account], db.posts_df(client_id),
-                                   db.meetings_df(client_id), cur_id, account)
-
-
-A = get_analysis() if page not in ("➕ 新しいデータを追加", "🛠 データの確認・修正・削除", "📖 用語集", "❓ 使い方") else None
-NEEDS_DATA = page in PAGES[:1] + PAGES[3:10]
-if NEEDS_DATA and A is None:
-    st.info("まだデータがありません。「➕ 新しいデータを追加」から数字を入れてください。")
-    st.stop()
+        st.info("まだデータがありません。「➕ 新しいデータを追加」からファイルを入れてください。")
+        st.stop()
+    dm = db.meetings_df(client_id)
+    fp = (len(daily_all), float(daily_all.drop(columns=["id", "client_id", "sns", "account", "date"]).sum().sum()), len(dm), len(db.demographics_df(client_id)),
+          "|".join(dm["decided"].tolist() + dm["next_actions"].tolist()))
+    A = _build(client_id, client_name, account, cur_id, fp)
 
 # ------------------------------------------------------------ 各ページ
 if page == PAGES[0]:
     st.header(f"{client_name} の SNS まとめ")
-    st.caption(f"Instagram / @{A['account']} / 対象期間 {A['period']}(全{A['n_periods']}期間のデータ)")
-    show(report.render_section("summary", A) + report.render_section("changes", A))
-    show(report.render_section("follower", A))
+    st.caption(f"Instagram / @{A['account']} / 対象期間 {A['period']}(全{A['n_periods']}か月分のデータ)")
+    show(report.render_section("summary", A) + report.render_section("changes", A) + report.render_section("follower", A)
+         + report.render_section("data_notes", A))
 
 elif page == PAGES[1]:
     st.header("新しいデータを追加")
     st.caption("追加したデータは、過去のデータを消さずにたまっていきます。「*」は必須です。空欄にした項目は「データなし」になります。")
-    tabs = st.tabs(["① 期間の数字", "② 投稿ごとの数字", "③ CSV/Excelで追加", "④ 会議メモ"])
+    tabs = st.tabs(["① ファイルで追加(おすすめ)", "② 1日ぶんを手入力", "③ 会議メモ"])
     with tabs[0]:
-        st.info("1行 = 1つの期間です。毎回「同じ長さの期間」(たとえば1か月ごと)で入れると、前回との比較が正しく見られます。")
-        c1, c2, c3 = st.columns(3)
-        ps = c1.date_input("期間の開始日 *", value=date.today().replace(day=1), key="snap_ps")
-        pe = c2.date_input("期間の終了日 *", value=date.today(), key="snap_pe")
-        acc_in = c3.text_input("アカウント名 *", value=account or "", placeholder="例: sample_cafe_official", key="snap_acc",
-                               help="→ Instagramのユーザー名(@の後ろ)")
-        st.text_input("SNSの種類", value="Instagram", disabled=True)
-        vals, errs = number_inputs(SNAP_NUM, REQUIRED_SNAP, "snap")
-        over = st.checkbox("同じ期間のデータが既にあるときは、上書きする", key="snap_over")
-        if st.button("この内容で追加", type="primary", key="snap_btn"):
+        st.write("Instagramのインサイトから書き出した **Excel / CSV を、まとめて** 選んでください(複数ファイルOK)。"
+                 "種類・アカウント名・期間は、ファイルの中身とファイル名から自動で見分けます。")
+        st.markdown("対応しているファイル: " + " / ".join(importer.KIND_LABEL.values()))
+        ups = st.file_uploader("ファイルを選ぶ(複数可)", type=["xlsx", "xls", "csv"], accept_multiple_files=True)
+        mode = st.radio("同じ日・同じ期間の数字が既にあるとき", ["今ある数字は変えない(空欄だけ埋める)", "ファイルの数字で上書きする"], key="imp_mode")
+        if ups:
+            plans = []
+            for i, up in enumerate(ups):
+                p = importer.plan_file(up.name, up.getvalue())
+                with st.expander(f"📄 {up.name}", expanded=True):
+                    if p["df"] is None:
+                        st.error(p["error"])
+                        continue
+                    kinds = list(importer.KIND_LABEL)
+                    c1, c2 = st.columns(2)
+                    kind = c1.selectbox("種類", kinds, index=kinds.index(p["kind"]) if p["kind"] else 0, format_func=importer.KIND_LABEL.get, key=f"k{i}")
+                    acc = c2.text_input("アカウント名 *", value=p["account"] or account, key=f"a{i}", help="→ Instagramのユーザー名(@の後ろ)")
+                    if kind in ("age", "gender"):
+                        d1, d2 = st.columns(2)
+                        s_ = d1.date_input("期間の開始日 *", value=date.fromisoformat(p["start"]) if p["start"] else date.today().replace(day=1), key=f"s{i}")
+                        e_ = d2.date_input("期間の終了日 *", value=date.fromisoformat(p["end"]) if p["end"] else date.today(), key=f"e{i}")
+                    else:
+                        s_ = e_ = None
+                        rows, errs, ign = importer.convert_daily(p["df"])
+                        if rows:
+                            st.write(f"読み取れた日: **{len(rows)}日分**({rows[0]['date']}〜{rows[-1]['date']}) / エラー: **{len(errs)}行**")
+                        for e in errs[:10]:
+                            st.error(e)
+                        if ign:
+                            st.caption("読み取らなかった列: " + "、".join(ign) + "(この分析では使わない列です)")
+                    st.dataframe(p["df"].head(5), hide_index=True, width="stretch")
+                    plans.append((p, acc.strip(), kind, s_, e_))
+            if plans and st.button(f"{len(plans)}ファイルを取り込む", type="primary", key="imp_btn"):
+                cid = client_id
+                for p, acc, kind, s_, e_ in plans:
+                    if not acc:
+                        st.error(f"{p['name']}: アカウント名を入力してください。")
+                        continue
+                    msg = importer.import_plan(db, cid, p, acc, kind, s_.isoformat() if s_ else None, e_.isoformat() if e_ else None, mode.startswith("ファイル"))
+                    st.write(f"・{p['name']}({importer.KIND_LABEL[kind]}): {msg}")
+                st.success("取り込みが終わりました。左のメニューから、まとめを見られます。")
+    with tabs[1]:
+        st.info("通常は「① ファイルで追加」を使います。ここは、数字を1日ぶんだけ直接入れたいときの入口です。")
+        c1, c2 = st.columns(2)
+        dd = c1.date_input("日付 *", value=date.today(), key="d_date")
+        acc_in = c2.text_input("アカウント名 *", value=account or "", placeholder="例: sample_account", key="d_acc", help="→ Instagramのユーザー名(@の後ろ)")
+        vals, errs = {}, []
+        cols = st.columns(3)
+        for i, (k, lab, ex, hlp) in enumerate(NUM_FIELDS):
+            with cols[i % 3]:
+                txt = st.text_input(lab + (" *" if k == "followers" else ""), key=f"d_{k}", placeholder=ex, help="→ " + hlp)
+            vals[k], e = parse_num(txt, lab, k == "followers", allow_negative=k in ("follower_net", "follows_change"))
+            if e:
+                errs.append(e)
+        st.write("その日に投稿した本数")
+        cols = st.columns(5)
+        for i, (k, lab, ex, hlp) in enumerate(COUNT_FIELDS):
+            vals[k] = cols[i].number_input(lab, min_value=0, step=1, key=f"d_{k}", help="→ " + hlp)
+        over = st.checkbox("同じ日のデータが既にあるときは、上書きする", key="d_over")
+        if st.button("この内容で追加", type="primary", key="d_btn"):
             if not acc_in.strip():
                 errs.append("「アカウント名」は必須です。")
-            if ps > pe:
-                errs.append("開始日が終了日より後になっています。")
             if errs:
                 for e in errs:
                     st.error(e)
             else:
-                rec = dict(account=acc_in.strip(), period_start=ps.isoformat(), period_end=pe.isoformat(), **vals)
-                r = db.save_snapshot(client_id, rec, over)
-                if r == "skipped":
-                    st.warning("同じ期間のデータが既にあります。上書きするときは、チェックを入れてもう一度押してください。")
-                else:
-                    st.success("追加しました。" if r == "inserted" else "上書きしました。")
-    with tabs[1]:
-        c1, c2, c3 = st.columns(3)
-        pd_ = c1.date_input("投稿日 *", value=date.today(), key="post_d")
-        known = c2.checkbox("投稿した時刻がわかる", value=True, key="post_known")
-        pt = c2.time_input("投稿した時刻", value=time(19, 0), key="post_t", disabled=not known)
-        ptype = c3.selectbox("投稿の種類 *", POST_TYPES, key="post_type")
-        theme = st.text_input("テーマ", placeholder="例: 新商品 / スタッフ紹介 / お客様の声", key="post_theme")
-        pv, perrs = number_inputs(POST_NUM, REQUIRED_POST, "post")
-        pover = st.checkbox("同じ日時・種類の投稿が既にあるときは、上書きする", key="post_over")
-        if st.button("この内容で追加", type="primary", key="post_btn"):
-            if perrs:
-                for e in perrs:
-                    st.error(e)
-            else:
-                at = datetime.combine(pd_, pt).strftime("%Y-%m-%d %H:%M") if known else pd_.isoformat()
-                r = db.save_post(client_id, dict(account=account or acc_in, posted_at=at, post_type=ptype, theme=theme.strip(), **pv), pover)
-                st.warning("同じ投稿が既にあります。上書きするときはチェックを入れてください。") if r == "skipped" else st.success("追加しました。")
+                r = db.upsert_daily(client_id, acc_in.strip(), [dict(date=dd.isoformat(), **vals)], over)
+                st.success("追加しました。" if r["inserted"] else "数字を更新しました。" if r["updated"] else "変化はありませんでした(同じ日の数字が既にあります。上書きするときはチェックを入れてください)。")
     with tabs[2]:
-        st.write("Instagramのインサイト(Meta Business Suite)などで書き出した **CSV / Excel** を選んでください。")
-        kind_lbl = st.radio("ファイルの中身", ["投稿ごとの数字(1行=1投稿)", "期間の数字(1行=1期間)"], horizontal=True)
-        kind = "post" if kind_lbl.startswith("投稿") else "account"
-        st.caption("サンプルのCSVは sample/ フォルダにあります(列名の例)。")
-        up = st.file_uploader("ファイルを選ぶ", type=["csv", "xlsx", "xls"])
-        if up:
-            try:
-                df = importer.read_table(up.name, up.getvalue())
-            except Exception as e:
-                st.error(str(e))
-                st.stop()
-            fields = importer.POST_FIELDS if kind == "post" else importer.ACCOUNT_FIELDS
-            req = importer.POST_REQUIRED if kind == "post" else importer.ACCOUNT_REQUIRED
-            guess = importer.guess_mapping(df, fields)
-            st.subheader("列の対応づけ")
-            st.caption("自動で見つけた対応です。違うときは選び直してください(「—」は「データなし」)。")
-            mapping, cols = {}, st.columns(3)
-            for i, (f, lab) in enumerate(fields.items()):
-                choices = ["—"] + list(df.columns)
-                dflt = choices.index(guess[f]) if guess[f] in choices else 0
-                with cols[i % 3]:
-                    sel = st.selectbox(lab + (" *" if f in req or (kind == "account" and f == "account") else ""), choices, index=dflt, key=f"map_{kind}_{f}")
-                mapping[f] = None if sel == "—" else sel
-            defaults = {}
-            if kind == "account" and not mapping.get("account"):
-                defaults["account"] = st.text_input("アカウント名(ファイルに無いとき) *", value=account or "", key="imp_acc")
-            rows, errs = importer.convert(df, mapping, kind, defaults)
-            st.subheader("取り込み前の確認")
-            st.write(f"読み取れた行: **{len(rows)}行** / エラー: **{len(errs)}行**")
-            for e in errs[:20]:
-                st.error(e)
-            if rows:
-                prev = pd.DataFrame(rows)
-                exists = [(db.snapshot_exists if kind == "account" else db.post_exists)(client_id, dict(r, sns="Instagram")) for r in rows]
-                prev.insert(0, "状態", ["既にある" if x else "新規" for x in exists])
-                st.dataframe(prev, width="stretch", hide_index=True)
-                ow = st.checkbox(f"「既にある」{sum(exists)}行は上書きする(チェックしないと、飛ばします)", key="imp_over") if any(exists) else False
-                if st.button(f"{len(rows)}行を追加する", type="primary", key="imp_btn"):
-                    cnt = dict(inserted=0, updated=0, skipped=0)
-                    for r in rows:
-                        r = dict(r, sns="Instagram")
-                        if kind == "post":
-                            r.setdefault("account", account)
-                        cnt[(db.save_snapshot if kind == "account" else db.save_post)(client_id, r, ow)] += 1
-                    st.success(f"新規 {cnt['inserted']}行 / 上書き {cnt['updated']}行 / 飛ばした {cnt['skipped']}行")
-    with tabs[3]:
-        md = st.date_input("会議の日", value=date.today(), key="mt_d")
-        decided = st.text_area("今回決まったこと", placeholder="例: 来月はリールを週2本にする", key="mt_dec")
-        nxt = st.text_area("次にやること", placeholder="例: 豆知識の投稿を3本つくる(担当: 〇〇)", key="mt_next")
+        md_ = st.date_input("会議の日", value=date.today(), key="mt_d")
+        decided = st.text_area("今回決まったこと", placeholder="例: 来月は週2回、投稿する", key="mt_dec")
+        nxt = st.text_area("次にやること", placeholder="例: プロフィールのリンクの文言を直す(担当: 〇〇)", key="mt_next")
         if st.button("会議メモを保存", type="primary", key="mt_btn"):
             if not (decided.strip() or nxt.strip()):
                 st.error("「決まったこと」か「次にやること」のどちらかは入力してください。")
             else:
-                db.add_meeting(client_id, md.isoformat(), decided.strip(), nxt.strip())
+                db.add_meeting(client_id, md_.isoformat(), decided.strip(), nxt.strip())
                 st.success("保存しました。")
 
 elif page == PAGES[2]:
     st.header("データの確認・修正・削除")
     st.caption("表の数字を直して「変更を保存」を押すと直ります。「削除」にチェックを入れて保存すると消えます(元には戻せません)。")
-    tabs = st.tabs(["期間の数字", "投稿ごとの数字", "会議メモ"])
+    tabs = st.tabs(["日ごとの数字", "フォロワーの年齢・性別", "会議メモ"])
 
-    def editor(df, table, cols, cfg, key, updater):
+    def editor(df, table, cols, cfg, key, updater, disabled=()):
         if df.empty:
             st.info("データがまだありません。")
             return
         d = df[["id"] + cols].copy()
         d.insert(1, "削除", False)
-        ed = st.data_editor(d, column_config=cfg, disabled=["id"], hide_index=True, width="stretch", key=key)
+        ed = st.data_editor(d, column_config=cfg, disabled=["id", *disabled], hide_index=True, width="stretch", key=key)
         ok = st.checkbox("削除にチェックした行を、本当に削除する", key=key + "_ok")
         if st.button("変更を保存", type="primary", key=key + "_btn"):
             changed, dels = diff_edits(d, ed)
@@ -237,53 +231,54 @@ elif page == PAGES[2]:
 
     if st.session_state.get("edit_msg"):
         st.success(st.session_state.pop("edit_msg"))
-
-    num_cfg = lambda keys: {k: st.column_config.NumberColumn(NUM_LABELS[k], min_value=0, help="→ " + NUM_HELP[k]) for k in keys}
     with tabs[0]:
-        sdf = db.snapshots_df(client_id)
-        editor(sdf, "snapshots", ["account", "period_start", "period_end"] + SNAP_NUM,
-               {"account": "アカウント名", "period_start": "開始日", "period_end": "終了日", **num_cfg(SNAP_NUM)}, "ed_s",
-               lambda b: db.update_snapshot(int(b["id"]), {k: (None if pd.isna(b[k]) else b[k]) for k in b.index}))
+        ddf = db.daily_df(client_id, account) if account else pd.DataFrame()
+        cfg = {"date": "日付", **{k: st.column_config.NumberColumn(lab, help="→ " + hlp) for k, lab, _, hlp in DAILY_FIELDS}}
+        editor(ddf, "daily", ["date"] + db.DAILY_COLS, cfg, "ed_d",
+               lambda b: db.update_daily(int(b["id"]), {k: (None if pd.isna(b[k]) else b[k]) for k in b.index}))
     with tabs[1]:
-        pdf_ = db.posts_df(client_id)
-        editor(pdf_, "posts", ["posted_at", "post_type", "theme"] + POST_NUM,
-               {"posted_at": "投稿日時", "post_type": st.column_config.SelectboxColumn("種類", options=POST_TYPES),
-                "theme": "テーマ", **num_cfg(POST_NUM)}, "ed_p",
-               lambda b: db.update_post(int(b["id"]), {k: (None if pd.isna(b[k]) else b[k]) for k in b.index}))
+        gdf = db.demographics_df(client_id, account) if account else pd.DataFrame()
+        editor(gdf, "demographics", ["period_start", "period_end", "kind", "grp", "female_pct", "female_n", "male_pct", "male_n"],
+               {"period_start": "開始日", "period_end": "終了日", "kind": "種類(age=年齢/gender=性別)", "grp": "区分", "female_pct": "女性(%)",
+                "female_n": "女性(人)", "male_pct": "男性(%)", "male_n": "男性(人)"}, "ed_g", lambda b: None,
+               disabled=["period_start", "period_end", "kind", "grp", "female_pct", "female_n", "male_pct", "male_n"])
+        st.caption("年齢・性別は、直すときは削除してから、ファイルをもう一度取り込んでください。")
     with tabs[2]:
         mdf = db.meetings_df(client_id)
         editor(mdf, "meetings", ["meeting_date", "decided", "next_actions"],
                {"meeting_date": "会議の日", "decided": "決まったこと", "next_actions": "次にやること"}, "ed_m",
                lambda b: db.update_meeting(int(b["id"]), b["meeting_date"], b["decided"] or "", b["next_actions"] or ""))
 
-elif page in PAGES[3:7]:
-    d = A["deep"][PAGES.index(page) - 3]
-    show(report.render_section("deep", A, d))
-
-elif page == PAGES[7]:
-    st.header("投稿の分析")
-    show(report.render_section("posts", A) + report.render_section("breakdowns", A))
+elif page in PAGES[3:8]:
+    show(report.render_section("deep", A, A["deep"][PAGES.index(page) - 3]))
 
 elif page == PAGES[8]:
-    st.header("過去との比較")
-    st.caption("「前回の会議」「1か月前」「3か月前」と比べています。比べる相手の期間が見つからないときは「データなし」と出ます。")
-    show(report.render_section("changes", A))
-    key_names = {k: n for k, n, _ in analysis.METRICS}
-    S = A["snaps_df"]
-    k = st.selectbox("推移を見る項目", list(key_names), format_func=lambda x: key_names[x])
-    kind = {kk: kd for kk, _, kd in analysis.METRICS}[k]
-    labs = [analysis.label_of(r) for _, r in S.iterrows()]
-    f = ch.fmt_pct if kind == "rate" else ch.fmt_int
-    show(ch.line_chart(labs, [(key_names[k], [None if pd.isna(v) else float(v) for v in S[k]])], f, key_names[k] + "の推移"))
+    st.header("投稿した日の分析")
+    show(report.render_section("posts", A) + report.render_section("breakdowns", A))
 
 elif page == PAGES[9]:
+    st.header("過去との比較")
+    st.caption("「前回の会議」「1か月前」「3か月前」と比べています。比べる相手の月が無いときは「データなし」と出ます。")
+    show(report.render_section("changes", A))
+    S, G = A["monthly_df"], A["daily_df"]
+    opts = {"end_followers": "フォロワー数(その日の終わり)", "follower_net": "フォロワー増減", "profile_views": "プロフィールアクセス",
+            "link_taps": "リンククリック", "impressions": "インプレッション", "reach": "リーチ", "likes": "いいね", "comments": "コメント", "saves": "保存"}
+    k = st.selectbox("日ごとの推移を見る項目", list(opts), format_func=opts.get)
+    show(ch.line_chart([analysis.md(x) for x in G["dt"]], [(opts[k], [None if pd.isna(v) else float(v) for v in G[k]])], ch.fmt_int, opts[k] + "の推移"))
+    if len(S) >= 2:
+        mk = {"followers": "フォロワー数", "impressions": "インプレッション", "reach": "リーチ", "profile_visits": "プロフィールアクセス", "link_clicks": "リンククリック"}
+        k2 = st.selectbox("月ごとの推移を見る項目", list(mk), format_func=mk.get)
+        show(ch.line_chart([analysis.month_label(r) for _, r in S.iterrows()], [(mk[k2], [None if pd.isna(v) else float(v) for v in S[k2]])], ch.fmt_int, mk[k2] + "の月ごとの推移"))
+    else:
+        st.info("月ごとの推移は、2か月分のデータがたまると表示されます。")
+
+elif page == PAGES[10]:
     st.header("分析ファイルを作る")
-    st.write(f"対象: **{client_name}** / 期間 **{A['period']}**(左の「今回の期間」で変えられます)")
+    st.write(f"対象: **{client_name}** / 期間 **{A['period']}**(左の「今回の月」で変えられます)")
     lab = st.text_input("ファイルにつける名前(省略できます)", placeholder="例: 10月定例会議", key="rep_label")
     if st.button("📄 分析ファイルを作る(Excel + HTML + PDF)", type="primary"):
         with st.spinner("作成中…(PDFは数秒かかります)"):
             res = report.create_files(client_id, A, lab.strip())
-        st.session_state["last_report"] = {k: (str(v) if v else None) for k, v in res.items()}
         st.success("作成しました。下のボタンからダウンロードできます。")
         if res["pdf_error"]:
             st.warning("PDFは作れませんでした。README の「PDFが作れないとき」を見てください。(" + res["pdf_error"] + ")")
@@ -304,9 +299,9 @@ elif page == PAGES[9]:
         c[0].write(f"**{r.created_at}** ／ 期間 {r.period_label} {('／ ' + r.label) if r.label else ''}")
         for col, (nm, attr, mime) in zip(c[1:], MIMES):
             with col:
-                dl(f"{nm}", getattr(r, attr), mime, f"dl_{r.id}_{attr}")
+                dl(nm, getattr(r, attr), mime, f"dl_{r.id}_{attr}")
 
-elif page == PAGES[10]:
+elif page == PAGES[11]:
     st.header("用語集")
     st.caption("用語 → 意味 → 数字の見方(良い目安)")
     show("<style>" + report.CSS + "</style><div class='card'><div class='scroll'><table class='gl'><tr><th>用語</th><th>→ 意味</th><th>→ 数字の見方(良い目安)</th></tr>"
@@ -318,10 +313,11 @@ else:
 ### 毎回の会議の流れ(3ステップ)
 ```
 ①  ➕新しいデータを追加   →   ②  🏠ホームで確認(深掘りページで説明)   →   ③  📄分析ファイルを作る
-   (数字を入れる/CSV)          (矢印と色で良し悪しが分かる)            (PDF・HTML・Excel)
+   (インサイトのファイルを       (矢印と色で良し悪しが分かる)            (PDF・HTML・Excel)
+    まとめて選ぶ)
 ```
-1. **新しいデータを追加**: 「期間の数字」と「投稿ごとの数字」を入力、またはインサイトのCSV/Excelをアップロードします。会議メモもここで残せます。
-2. **画面を共有して説明**: 「ホーム」で今回のまとめ、「深掘り」の4ページで1つずつ説明します。
+1. **新しいデータを追加**: 「ファイルで追加」で、Instagramインサイトのファイル(フォロワー・エンゲージメント・プロフィール・年齢・性別)をまとめて選びます。会議メモもここで残せます。
+2. **画面を共有して説明**: 「ホーム」で今回のまとめ、「深掘り」の5ページで1つずつ説明します。
 3. **分析ファイルを作る**: ボタン1つで PDF・HTML・Excel が作られ、その場でダウンロードできます。過去のファイルも一覧から再ダウンロードできます。
 
 ### 色と矢印の見方
@@ -329,7 +325,7 @@ else:
 
 ### 困ったとき
 - 間違えて入れた → 「🛠 データの確認・修正・削除」で直せます。
-- 数字が分からない項目 → 空欄にすると「データなし」になります(推測では埋めません)。
+- 数字がない項目 → 「データなし」と出ます(推測では埋めません)。
 - 言葉が分からない → 「📖 用語集」を見てください。
 詳しくは README.md を見てください。
 """, unsafe_allow_html=True)

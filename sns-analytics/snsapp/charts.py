@@ -44,7 +44,10 @@ def line_chart(labels, series, fmt=fmt_int, title="推移"):
         gv = lo + (hi - lo) * k / 4
         out.append(f'<line x1="{L}" x2="{W - R}" y1="{y(gv):.1f}" y2="{y(gv):.1f}" stroke="{GRID}"/>'
                    f'<text x="{L - 8}" y="{y(gv) + 4:.1f}" text-anchor="end" font-size="12" fill="{GRAY}">{escape(fmt(gv))}</text>')
-    for x, lab in zip(xs, labels):
+    step = max(1, -(-n // 10))  # 点が多いときはラベルを間引く
+    for i, (x, lab) in enumerate(zip(xs, labels)):
+        if i % step and i != n - 1:
+            continue
         out.append(f'<text x="{x:.1f}" y="{H - 16}" text-anchor="middle" font-size="12" fill="{GRAY}">{escape(str(lab))}</text>')
     for si, (name, vs) in enumerate(series):
         col = COLORS[si % len(COLORS)]

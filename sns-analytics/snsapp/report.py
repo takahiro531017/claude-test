@@ -79,20 +79,20 @@ def render_xlsx(a, path: Path):
     if a["posts"]["ok"]:
         for tag, key in [("ベスト", "top"), ("ワースト", "worst")]:
             for i, p in enumerate(a["posts"][key], 1):
-                rows.append([f"{tag}{i}", p["date"], p["type"], p["theme"], p["rate"], p["reach"], p["likes"], p["saves"], p["why"]])
+                rows.append([f"{tag}{i}", p["date"], p["type"], p["rate"], p["reach"], p["impressions"], p["likes"], p["comments"], p["saves"], p["why"]])
     else:
         rows.append([a["posts"]["note"]])
-    _sheet(wb, "投稿ベスト・ワースト", ["順位", "投稿日時", "種類", "テーマ", "エンゲージメント率→反応した人の割合", "リーチ→見た人の数", "いいね", "保存", "理由の仮説"],
-           rows, [10, 18, 12, 14, 18, 14, 10, 10, 80])
+    _sheet(wb, "投稿日ベスト・ワースト", ["順位", "投稿した日", "種類", "エンゲージメント率→反応した人の割合", "リーチ→見た人の数", "インプレッション→見られた回数",
+                                          "いいね", "コメント", "保存", "理由の仮説"], rows, [10, 14, 16, 18, 14, 18, 10, 10, 10, 80])
     for b in a["breakdowns"]:
-        _sheet(wb, b["title"], ["区分", "投稿数", "平均リーチ→見た人の数", "エンゲージメント率→反応した人の割合", "保存率→保存した人の割合"],
+        _sheet(wb, b["title"], ["区分", "日数", "平均リーチ→見た人の数", "エンゲージメント率→反応した人の割合", "保存率→保存した人の割合"],
                [[r["key"], r["n"], None if r["avg_reach"] is None else round(r["avg_reach"]), r["rate"], r["save_rate"]] for r in b.get("rows", [])]
                or [["データなし"]], [20, 10, 22, 24, 22])
         for row in wb[b["title"]].iter_rows(min_row=2, min_col=4, max_col=5):
             for c in row:
                 c.number_format = "0.00%"
     s = a["series"]
-    fw = _sheet(wb, "フォロワー推移", ["期間", "フォロワー数→フォローしている人の数", "フォロワー増加数→期間中に増えた人数"],
+    fw = _sheet(wb, "フォロワー推移", ["日付", "フォロワー数(その日の終わり)→フォローしている人の数", "フォロワー増減→その日に増えた人数"],
                 [[l, f, g] for l, f, g in zip(s["labels"], s["followers"], s["gain"])], [14, 30, 30])
     if len(s["labels"]) > 1:
         lc = LineChart()
@@ -106,6 +106,10 @@ def render_xlsx(a, path: Path):
            + [[d["title"], "理由の仮説", h] for d in a["deep"] for h in d["hypotheses"]], [30, 16, 110])
     _sheet(wb, "次にやること", ["#", "やること", "なぜ", "どうやる"],
            [[i, x["title"], x["why"], x["how"]] for i, x in enumerate(a["suggestions"], 1)], [5, 36, 70, 70])
+    _sheet(wb, "データの読み方", ["注意"], [[n] for n in a["data_notes"]], [150])
+    daily = a["daily_df"]
+    cols = [c for c in ["date"] + db.DAILY_COLS if c in daily.columns]
+    _sheet(wb, "日ごとの数字", ["日付"] + [db.DAILY_LABEL[c] for c in cols[1:]], daily[cols].astype(object).where(daily[cols].notna(), None).values.tolist(), [12] + [14] * (len(cols) - 1))
     _sheet(wb, "用語集", ["用語", "→ 意味", "→ 数字の見方(良い目安)"], [[g["term"], "→ " + g["meaning"], g["guide"]] for g in a["glossary"]], [22, 60, 80])
     wb.save(path)
 

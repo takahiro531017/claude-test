@@ -28,16 +28,17 @@
 
 {% macro posts(a) %}
 <section class="card">
-  <h2>よく見られた投稿ベスト3 / 反応が少なかった投稿ワースト3</h2>
-  <p class="note">反応の多さは「エンゲージメント率 → 見た人のうち、いいね・コメント・保存などの反応をした人の割合」で比べています。理由は数字から考えた<b>仮説</b>で、断定ではありません。</p>
+  <h2>反応が良かった投稿日ベスト3 / 反応が少なかった投稿日ワースト3</h2>
+  <p class="note">このデータは「投稿1本ずつ」ではなく「その日に投稿した分の合計」です。そのため、<b>投稿した日</b> ごとに比べています。
+  反応の多さは「エンゲージメント率 → 見た人のうち、いいね・コメント・保存などの反応をした人の割合」です。理由は数字から考えた<b>仮説</b>で、断定ではありません。</p>
   {% if not a.posts.ok %}<p class="nodata">{{ a.posts.note }}</p>{% else %}
   <h3>👍 ベスト3</h3>
-  {% for p in a.posts.top %}<div class="post good"><b>{{ loop.index }}位</b> {{ p.date }} ／ {{ p.type }} ／ {{ p.theme or 'テーマなし' }}<br>
-    反応の割合 {{ p.rate }}・リーチ(見た人) {{ p.reach }}・いいね {{ p.likes }}・保存 {{ p.saves }}<p class="why">💡 理由の仮説: {{ p.why }}</p></div>{% endfor %}
+  {% for p in a.posts.top %}<div class="post good"><b>{{ loop.index }}位</b> {{ p.date }} ／ {{ p.type }}<br>
+    反応の割合 {{ p.rate }}・リーチ(見た人) {{ p.reach }}・インプレッション(見られた回数) {{ p.impressions }}・いいね {{ p.likes }}・コメント {{ p.comments }}・保存 {{ p.saves }}<p class="why">💡 理由の仮説: {{ p.why }}</p></div>{% endfor %}
   <h3>👎 ワースト3</h3>
-  {% for p in a.posts.worst %}<div class="post bad"><b>{{ loop.index }}</b> {{ p.date }} ／ {{ p.type }} ／ {{ p.theme or 'テーマなし' }}<br>
-    反応の割合 {{ p.rate }}・リーチ(見た人) {{ p.reach }}・いいね {{ p.likes }}・保存 {{ p.saves }}<p class="why">💡 理由の仮説: {{ p.why }}</p></div>
-  {% else %}<p class="nodata">投稿が少ないため、ワーストは{{ 'データなし' }}です。</p>{% endfor %}
+  {% for p in a.posts.worst %}<div class="post bad"><b>{{ loop.index }}</b> {{ p.date }} ／ {{ p.type }}<br>
+    反応の割合 {{ p.rate }}・リーチ(見た人) {{ p.reach }}・インプレッション(見られた回数) {{ p.impressions }}・いいね {{ p.likes }}・コメント {{ p.comments }}・保存 {{ p.saves }}<p class="why">💡 理由の仮説: {{ p.why }}</p></div>
+  {% else %}<p class="nodata">投稿した日が少ないため、ワーストは{{ 'データなし' }}です。</p>{% endfor %}
   {% endif %}
 </section>
 {% endmacro %}
@@ -45,7 +46,7 @@
 {% macro breakdowns(a) %}
 <section class="card">
   <h2>投稿の種類別・曜日別・時間帯別の比較</h2>
-  <p class="note">本数が少ないグループは、たまたまの結果かもしれません。参考として見てください。</p>
+  <p class="note">投稿した日ごとの数字を、種類・曜日・時間帯でまとめています。日数が少ないグループは、たまたまの結果かもしれません。参考として見てください。ストーリーズの数字はデータなしです。</p>
   {% for b in a.breakdowns %}<h3>{{ b.title }}</h3>
     {% if not b.ok %}<p class="nodata">{{ b.note }}</p>{% else %}
     <div class="grid2"><div><h4>反応の割合(エンゲージメント率)</h4>{{ b.rate_svg|safe }}</div>
@@ -65,6 +66,7 @@
   {% for r in d.reading %}<p class="big">{{ r }}</p>{% endfor %}
   {% for c in d.charts %}<h3>{{ c.title }}</h3>{{ c.svg|safe }}<p class="comment">{{ c.comment }}</p>{% endfor %}
   <h3>💡 考えられる理由(仮説)</h3><ul>{% for h in d.hypotheses %}<li>{{ h }}</li>{% endfor %}</ul>
+  {% if d.note %}<p class="note">{{ d.note }}</p>{% endif %}
 </section>
 {% endmacro %}
 
@@ -76,6 +78,11 @@
   {% if a.memo.prev_next or a.memo.cur_decided %}<h3>📝 会議メモ({{ a.memo.cur_date }})</h3>
     <p><b>決まったこと:</b> {{ a.memo.cur_decided or 'なし' }}</p><p><b>次にやること:</b> {{ a.memo.prev_next or 'なし' }}</p>{% endif %}
 </section>
+{% endmacro %}
+
+{% macro data_notes(a) %}
+<section class="card"><h2>このデータの読み方(注意)</h2>
+  <ul class="notes">{% for n in a.data_notes %}<li>{{ n }}</li>{% endfor %}</ul></section>
 {% endmacro %}
 
 {% macro glossary(a) %}
@@ -93,5 +100,5 @@
   <p>{{ a.client }} ／ Instagram ／ @{{ a.account }}</p><p>対象期間: {{ a.period }}　作成日: {{ a.created }}</p></header>
 {{ summary(a) }}{{ changes(a) }}{{ posts(a) }}{{ breakdowns(a) }}{{ follower(a) }}
 {% for d in a.deep %}{{ deep(a, d) }}{% endfor %}
-{{ suggestions(a) }}{{ glossary(a) }}
+{{ suggestions(a) }}{{ data_notes(a) }}{{ glossary(a) }}
 </main></body></html>{% endmacro %}

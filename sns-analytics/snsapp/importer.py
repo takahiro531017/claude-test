@@ -1,44 +1,41 @@
-"""インサイトのCSV/Excel取り込み。列名のゆれを吸収し、足りない列は画面で選べるようにする。"""
+"""インサイトのExcel/CSVの取り込み。5種類(フォロワー・エンゲージメント・プロフィール・年齢・性別)を列名から自動で見分ける。"""
 import io
 import re
 
 import pandas as pd
 
-from .db import POST_NUM, SNAP_NUM
+from .db import COUNT_COLS, DAILY_COLS
 
-ACCOUNT_FIELDS = {
-    "period_start": "開始日", "period_end": "終了日", "account": "アカウント名", "followers": "フォロワー数",
-    "impressions": "インプレッション", "reach": "リーチ", "likes": "いいね", "comments": "コメント", "saves": "保存",
-    "shares": "シェア", "profile_visits": "プロフィールアクセス", "link_clicks": "リンククリック",
+KIND_LABEL = {
+    "followers": "フォロワーの推移(日ごと)", "engagement": "投稿の反応の推移(日ごと)", "profile": "プロフィールの動き(日ごと)",
+    "age": "フォロワーの年齢", "gender": "フォロワーの性別",
 }
-POST_FIELDS = {
-    "posted_at": "投稿日時", "post_type": "投稿タイプ", "theme": "テーマ", "caption": "キャプション(説明文)",
-    "impressions": "インプレッション", "reach": "リーチ", "likes": "いいね", "comments": "コメント", "saves": "保存",
-    "shares": "シェア", "profile_visits": "プロフィールアクセス", "link_clicks": "リンククリック",
-}
-ACCOUNT_REQUIRED = ["period_start", "period_end", "followers", "impressions", "reach"]
-POST_REQUIRED = ["posted_at", "post_type", "reach"]
 
+# 日ごとの数字: DB列名 → 列名のゆれ
 ALIASES = {
-    "period_start": ["開始日", "期間開始", "期間の開始", "periodstart", "startdate", "start", "from"],
-    "period_end": ["終了日", "期間終了", "期間の終了", "periodend", "enddate", "end", "to"],
-    "account": ["アカウント名", "アカウント", "account", "accountname", "username", "ユーザー名"],
+    "date": ["日付", "日", "date", "day"],
     "followers": ["フォロワー数", "フォロワー", "followers", "followercount"],
-    "impressions": ["インプレッション", "インプレッション数", "表示", "表示回数", "impressions", "views", "閲覧数", "視聴数"],
+    "follower_net": ["トータルフォロワー増減", "フォロワー増減", "フォロワー増加数", "followerchange", "netfollowers"],
+    "new_followers": ["新規フォロワー増数", "新規フォロワー数", "新規フォロワー", "newfollowers"],
+    "follows": ["フォロー数", "following"],
+    "follows_change": ["フォロー増減"],
+    "impressions": ["インプレッション", "インプレッション数", "表示回数", "表示", "impressions", "views"],
     "reach": ["リーチ", "リーチ数", "reach"],
-    "likes": ["いいね", "いいね!", "いいね数", "likes", "like"],
-    "comments": ["コメント", "コメント数", "comments", "comment"],
-    "saves": ["保存", "保存数", "saves", "save", "saved"],
-    "shares": ["シェア", "シェア数", "共有", "shares", "share"],
-    "profile_visits": ["プロフィールアクセス", "プロフィールへのアクセス", "プロフィールアクセス数", "プロフィールの表示",
-                       "profilevisits", "profileviews"],
-    "link_clicks": ["リンククリック", "リンクのクリック", "リンククリック数", "ウェブサイトのクリック", "linkclicks",
-                    "websiteclicks", "linkclick"],
-    "posted_at": ["投稿日時", "公開日時", "投稿日", "公開日", "日付", "日時", "publishtime", "posttime", "date", "publishedat", "posteddate"],
-    "post_type": ["投稿タイプ", "投稿の種類", "種類", "タイプ", "posttype", "type", "mediatype"],
-    "theme": ["テーマ", "カテゴリ", "カテゴリー", "theme", "category", "topic"],
-    "caption": ["キャプション", "説明", "説明文", "タイトル", "description", "caption", "title"],
+    "likes": ["いいね", "いいね!", "いいね数", "likes"],
+    "comments": ["コメント", "コメント数", "comments"],
+    "saves": ["保存数", "保存", "saves"],
+    "shares": ["シェア数", "シェア", "共有", "shares"],
+    "video_views": ["動画再生", "動画再生数", "再生数", "videoviews", "plays"],
+    "profile_views": ["プロフィールビュー数", "プロフィールビュー", "プロフィールアクセス", "プロフィールへのアクセス", "profileviews", "profilevisits"],
+    "website_taps": ["ウェブサイトタップ数", "ウェブサイトのタップ", "リンククリック", "websitetaps", "linkclicks"],
+    "text_link_taps": ["テキスト内リンクタップ数", "テキストリンクタップ数"],
+    "email_taps": ["メールタップ数", "メールのタップ"],
+    "phone_taps": ["電話番号タップ数", "電話のタップ"],
+    "direction_taps": ["道順タップ数", "道順のタップ"],
+    "posts_image": ["画像投稿数"], "posts_carousel": ["カルーセル投稿数"], "posts_reel": ["リール投稿数"],
+    "posts_video": ["動画投稿数"], "posts_story": ["ストーリーズ投稿数", "ストーリー投稿数"],
 }
+FILE_RE = re.compile(r"([A-Za-z0-9._]+)_(\d{8})-(\d{8})")
 
 
 def _norm(s) -> str:
@@ -49,100 +46,133 @@ def read_table(name: str, raw: bytes) -> pd.DataFrame:
     if name.lower().endswith((".xlsx", ".xlsm", ".xls")):
         df = pd.read_excel(io.BytesIO(raw))
     else:
+        df = None
         for enc in ("utf-8-sig", "cp932", "utf-16"):
             try:
                 df = pd.read_csv(io.BytesIO(raw), encoding=enc, sep=None, engine="python")
                 break
             except Exception:
-                df = None
+                continue
         if df is None:
-            raise ValueError("ファイルを読めませんでした。CSV(文字コードUTF-8かShift_JIS)またはExcelで保存し直してください。")
+            raise ValueError("ファイルを読めませんでした。CSV(UTF-8かShift_JIS)またはExcelで保存し直してください。")
     df.columns = [str(c).strip() for c in df.columns]
     return df.dropna(how="all")
 
 
-def guess_mapping(df: pd.DataFrame, fields) -> dict:
-    """項目名 → ファイルの列名(見つからなければ None)"""
-    cols = {_norm(c): c for c in df.columns}
-    out, used = {}, set()
-    for f in fields:
-        out[f] = None
-        for a in ALIASES.get(f, []):
-            c = cols.get(_norm(a))
-            if c is not None and c not in used:
-                out[f], _ = c, used.add(c)
-                break
-    return out
+def detect_kind(df: pd.DataFrame):
+    cols = {_norm(c) for c in df.columns}
+    has = lambda *names: any(_norm(n) in cols for n in names)
+    if has("年齢"):
+        return "age"
+    if has("日付", "date"):
+        if has("フォロワー数", "followers"):
+            return "followers"
+        if has("インプレッション", "リーチ", "impressions", "reach"):
+            return "engagement"
+        if has("プロフィールビュー数", "profileviews", "プロフィールアクセス"):
+            return "profile"
+    if has("女性(%)", "女性(人)") and not has("日付"):
+        return "gender"
+    return None
+
+
+def parse_filename(name: str):
+    """ファイル名の「アカウント名_開始日-終了日」から (アカウント, 開始日, 終了日) を取り出す。無ければ None。"""
+    m = None
+    for m in FILE_RE.finditer(name):
+        pass
+    if not m:
+        return None, None, None
+    f = lambda s: f"{s[:4]}-{s[4:6]}-{s[6:]}"
+    return m.group(1).strip("_"), f(m.group(2)), f(m.group(3))
 
 
 def _to_num(v):
     if v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() in ("", "-", "—", "nan", "None"):
         return None
-    s = str(v).replace(",", "").replace("，", "").replace("人", "").replace("回", "").strip()
     try:
-        return float(s)
+        return float(str(v).replace(",", "").replace("，", "").replace("%", "").strip())
     except ValueError:
         raise ValueError(f"数字ではありません: 「{v}」")
 
 
-def _to_date(v):
-    d = pd.to_datetime(v, errors="coerce")
-    if pd.isna(d):
-        raise ValueError(f"日付として読めません: 「{v}」")
-    return d
-
-
-def normalize_post_type(v) -> str:
-    s = str(v).strip().lower()
-    if any(k in s for k in ("story", "stories", "ストーリー")):
-        return "ストーリーズ"
-    if any(k in s for k in ("reel", "リール")):
-        return "リール"
-    if any(k in s for k in ("video", "動画")):
-        return "動画"
-    if any(k in s for k in ("image", "photo", "carousel", "画像", "写真", "フォト", "カルーセル", "フィード")):
-        return "画像"
-    raise ValueError(f"投稿タイプが分かりません: 「{v}」(画像/動画/リール/ストーリーズのどれか)")
-
-
-def convert(df: pd.DataFrame, mapping: dict, kind: str, defaults: dict | None = None):
-    """df → (正しい行のリスト, エラー文のリスト)。kind は 'account' か 'post'。"""
-    defaults = defaults or {}
-    req = ACCOUNT_REQUIRED if kind == "account" else POST_REQUIRED
-    nums = SNAP_NUM if kind == "account" else POST_NUM
-    ok, errors = [], []
+def convert_daily(df: pd.DataFrame):
+    """日ごとの表 → (行のリスト, エラー文のリスト, 読み取らなかった列名)。空欄は「データなし」(None)。投稿数の空欄だけは0本。"""
+    cols = {_norm(c): c for c in df.columns}
+    mapping, used = {}, set()
+    for f, names in ALIASES.items():
+        for n in names:
+            c = cols.get(_norm(n))
+            if c is not None and c not in used:
+                mapping[f], _ = c, used.add(c)
+                break
+    ignored = [c for c in df.columns if c not in used]
+    rows, errors = [], []
     for i, row in df.iterrows():
-        line = i + 2  # 見出し行ぶん
-        rec = {}
         try:
-            for f, col in mapping.items():
-                v = row[col] if col else None
-                if f in nums:
-                    rec[f] = _to_num(v)
-                elif f in ("period_start", "period_end"):
-                    rec[f] = _to_date(v).date().isoformat() if col else None
-                elif f == "posted_at":
-                    d = _to_date(v)
-                    has_time = isinstance(v, str) and re.search(r"\d{1,2}:\d{2}", v) or (not isinstance(v, str) and (d.hour or d.minute))
-                    rec[f] = d.strftime("%Y-%m-%d %H:%M") if has_time else d.strftime("%Y-%m-%d")
-                elif f == "post_type":
-                    rec[f] = normalize_post_type(v) if col else None
-                else:
-                    rec[f] = "" if v is None or (isinstance(v, float) and pd.isna(v)) else str(v).strip()
-            for k, dv in defaults.items():
-                if not rec.get(k):
-                    rec[k] = dv
-            missing = [k for k in req if rec.get(k) in (None, "")]
-            if kind == "account" and not rec.get("account"):
-                missing.append("account")
-            if missing:
-                names = ACCOUNT_FIELDS if kind == "account" else POST_FIELDS
-                raise ValueError("必須の項目が空です: " + "、".join(names[m] for m in missing))
-            if any(rec.get(k) is not None and rec[k] < 0 for k in nums):
-                raise ValueError("マイナスの数字があります")
-            if kind == "account" and rec["period_start"] > rec["period_end"]:
-                raise ValueError("開始日が終了日より後になっています")
-            ok.append(rec)
+            d = pd.to_datetime(row[mapping["date"]], errors="coerce")
+            if pd.isna(d):
+                raise ValueError(f"日付として読めません: 「{row[mapping['date']]}」")
+            rec = {"date": d.date().isoformat()}
+            for f in DAILY_COLS:
+                if f in mapping:
+                    v = _to_num(row[mapping[f]])
+                    if v is None and f in COUNT_COLS:
+                        v = 0.0
+                    if v is not None and v < 0 and f not in ("follower_net", "follows_change"):
+                        raise ValueError(f"「{mapping[f]}」にマイナスの数字があります")
+                    rec[f] = v
+            rows.append(rec)
         except Exception as e:  # noqa: BLE001 — 行ごとのエラーを利用者に見せる
-            errors.append(f"{line}行目: {e}")
-    return ok, errors
+            errors.append(f"{i + 2}行目: {e}")
+    return rows, errors, ignored
+
+
+def convert_demographics(df: pd.DataFrame, kind: str):
+    """年齢・性別の表 → (行のリスト, エラー文のリスト)"""
+    cols = {_norm(c): c for c in df.columns}
+    get = lambda *n: next((cols[_norm(x)] for x in n if _norm(x) in cols), None)
+    fp, fn, mp, mn = get("女性(%)"), get("女性(人)"), get("男性(%)"), get("男性(人)")
+    ag = get("年齢")
+    rows, errors = [], []
+    if (kind == "age" and not ag) or not (fn and mn):
+        return [], ["「年齢」「女性(人)」「男性(人)」の列が見つかりません。"]
+    for i, r in df.iterrows():
+        try:
+            rows.append(dict(grp=str(r[ag]).strip() if kind == "age" else "全体",
+                             female_pct=_to_num(r[fp]) if fp else None, female_n=_to_num(r[fn]),
+                             male_pct=_to_num(r[mp]) if mp else None, male_n=_to_num(r[mn])))
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{i + 2}行目: {e}")
+    return rows, errors
+
+
+def plan_file(name: str, raw: bytes) -> dict:
+    """1ファイルを読み、種類・アカウント・期間を見分ける。読めないときは error に理由が入る。"""
+    out = dict(name=name, df=None, kind=None, account=None, start=None, end=None, error=None)
+    try:
+        out["df"] = read_table(name, raw)
+    except Exception as e:  # noqa: BLE001
+        out["error"] = str(e)
+        return out
+    out["kind"] = detect_kind(out["df"])
+    out["account"], out["start"], out["end"] = parse_filename(name)
+    if out["kind"] is None:
+        out["error"] = "どの種類のファイルか分かりませんでした。右の「種類」から選んでください。"
+    return out
+
+
+def import_plan(db, client_id, plan: dict, account: str, kind: str, start: str, end: str, overwrite: bool) -> str:
+    """1ファイルをDBに入れる。戻り値は画面に出す結果の文章。"""
+    df = plan["df"]
+    if kind in ("followers", "engagement", "profile"):
+        rows, errs, _ = convert_daily(df)
+        if errs:
+            return "取り込めませんでした: " + errs[0]
+        r = db.upsert_daily(client_id, account, rows, overwrite)
+        return f"新しい日 {r['inserted']}日 / 数字を追加・更新した日 {r['updated']}日 / 変化なし {r['unchanged']}日"
+    rows, errs = convert_demographics(df, kind)
+    if errs:
+        return "取り込めませんでした: " + errs[0]
+    res = db.save_demographics(client_id, account, kind, start, end, rows, overwrite)
+    return {"inserted": "追加しました", "updated": "入れ替えました", "skipped": "同じ期間のデータが既にあるため、飛ばしました(上書きにチェックすると入れ替えます)"}[res]
