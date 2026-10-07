@@ -1,0 +1,15 @@
+# 機密: マスタExcel・訪問DB・環境変数は絶対にコミットしない
+data/*
+!data/.gitkeep
+*.xlsx
+*.xls
+*.csv
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+backups/
