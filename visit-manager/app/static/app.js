@@ -171,20 +171,44 @@ function storeItem(s) {
   <div class="muted small">${esc(s.company)}${s.name ? "" : ""} ・ ${esc(s.code)} ・ ${esc(s.rep_name || "")}</div></div>
   <div class="r">${elapsedBadge(s)}<div class="muted small">${s.last_visit ? fmtDate(s.last_visit) : ""}</div></div></a>`;
 }
+let HOME_MONTH = "this";   // "this" = 今月, "prev" = 先月
+function repTable(d, ym) {
+  const max = Math.max(1, ...d.reps.map((r) => r.visits));
+  const row = (r) => `<tr class="click" data-rep="${esc(r.rep_code)}"><td><a href="#/stats/rep/${encodeURIComponent(r.rep_code)}?month=${ym}">${esc(r.rep_name)}</a>${r.rep_code === S.me.rep_code ? ' <span class="badge b-green" style="white-space:nowrap">あなた</span>' : ""}</td>
+    <td class="n"><b>${r.visits}</b><div class="bar"><i style="width:${Math.round((r.visits / max) * 100)}%"></i></div></td><td class="n">${r.stores}</td><td class="n">${r.assigned_stores}</td><td class="n">${pct(r.rate)}</td></tr>`;
+  return `<div class="card scroll compact"><table><thead><tr><th>営業</th><th class="n">訪問回数</th><th class="n">訪問店</th><th class="n">担当店</th><th class="n">訪問率</th></tr></thead><tbody>${d.reps.slice().sort((x, y) => y.visits - x.visits).map(row).join("")}
+    <tr><td><b>全体</b></td><td class="n"><b>${d.total.visits}</b></td><td class="n">${d.total.stores}</td><td class="n">${d.total.assigned_stores}</td><td class="n">${pct(d.total.rate)}</td></tr></tbody></table></div>`;
+}
 async function vHome(el) {
   const me = S.me, rep = me.rep_code || "";
-  const ym = S.meta.today.slice(0, 7);
+  const thisYm = S.meta.today.slice(0, 7), ym0 = thisYm;
   const [m, vis, over] = await Promise.all([
-    api("/api/stats/monthly" + qs({ month: ym, rep })),
-    api("/api/visits" + qs({ limit: 5, rep })),
+    api("/api/stats/monthly" + qs({ month: ym0, rep })),
+    api("/api/visits" + qs({ limit: 10 })),
     api("/api/stores" + qs({ min_days: S.meta.threshold_days, rep, sort: "days", order: "desc", limit: 5 }))]);
   el.innerHTML = `<h1>ホーム</h1><a class="btn pri block" href="#/visit">＋ 訪問を入力する</a>
-    <h2>${fmtMonth(ym)}の${rep ? "あなたの" : "全体の"}実績</h2>${kpiRow(m.summary)}
+    <h2>${fmtMonth(ym0)}の${rep ? "あなたの" : "全体の"}実績</h2>${kpiRow(m.summary)}
+    <div class="row" style="margin-top:18px;justify-content:space-between"><h2 style="margin:0">営業別の訪問件数</h2>
+      <div class="seg"><button id="hm0" class="${HOME_MONTH === "this" ? "on" : ""}">今月</button><button id="hm1" class="${HOME_MONTH === "prev" ? "on" : ""}">先月</button></div></div>
+    <p class="muted small" style="margin:4px 0 8px">営業名を押すと、その人の訪問履歴・法人別の件数が見られます。</p><div id="reptbl">${loading()}</div>
     <h2>${S.meta.threshold_days}日以上 未訪問の${rep ? "担当" : ""}店舗(上位5件)</h2>
     <div class="list">${over.items.length ? over.items.map(storeItem).join("") : `<div class="empty">該当する店舗はありません 👍</div>`}</div>
     ${over.items.length ? `<p><a href="#/stores">店舗一覧で見る →</a></p>` : ""}
-    <h2>最近の訪問${rep ? "(自分)" : ""}</h2>
-    <div class="list">${vis.items.length ? vis.items.map((v) => `<div class="item"><div><div class="t">${esc(v.display_name)}</div><div class="muted small">${esc(v.rep_name || "")}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div><div class="r">${fmtDate(v.visit_date)}</div></div>`).join("") : `<div class="empty">まだ訪問の記録がありません</div>`}</div>`;
+    <h2>最近の訪問(全員)</h2>
+    <div class="list">${vis.items.length ? vis.items.map((v) => `<a class="item" href="#/store/${encodeURIComponent(v.store_code)}"><div><div class="t">${esc(v.display_name)}</div><div class="muted small">${esc(v.company)} ・ ${esc(v.rep_name || "")}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div><div class="r">${fmtDate(v.visit_date)}</div></a>`).join("") : `<div class="empty">まだ訪問の記録がありません</div>`}</div>`;
+  async function loadReps() {
+    const box = $("#reptbl"); const ym = HOME_MONTH === "this" ? thisYm : addMonths(thisYm, -1);
+    $("#hm0").classList.toggle("on", HOME_MONTH === "this"); $("#hm1").classList.toggle("on", HOME_MONTH === "prev");
+    box.innerHTML = loading();
+    try {
+      const d = await api("/api/stats/by-rep" + qs({ month: ym }));
+      box.innerHTML = `<p class="muted small" style="margin:0 0 6px">${fmtMonth(ym)}</p>` + repTable(d, ym);
+      $$("tr[data-rep]", box).forEach((tr) => (tr.onclick = (ev) => { if (ev.target.tagName !== "A") location.hash = `#/stats/rep/${encodeURIComponent(tr.dataset.rep)}?month=${ym}`; }));
+    } catch (e) { fail(box, e, loadReps); }
+  }
+  $("#hm0").onclick = () => { HOME_MONTH = "this"; loadReps(); };
+  $("#hm1").onclick = () => { HOME_MONTH = "prev"; loadReps(); };
+  loadReps();
 }
 
 // ---------- 訪問入力 ----------

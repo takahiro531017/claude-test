@@ -88,3 +88,5 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--gray-l)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;color:var(--sub);margin-bottom:4px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
 pre.cred{background:var(--gray-l);padding:10px;border-radius:8px;overflow:auto}
+.bar{height:6px;border-radius:3px;background:var(--gray-l);margin-top:4px;min-width:60px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pri);border-radius:3px}
+@media (max-width:520px){.compact{padding:8px}.compact th,.compact td{padding:8px 4px;font-size:.85rem}}
