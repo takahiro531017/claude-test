@@ -99,3 +99,12 @@ def test_trend_12_months(conn, master):
     t = stats.monthly(conn, "2026-10")["trend"]
     assert len(t) == 12 and t[0]["month"] == "2025-11" and t[-1]["month"] == "2026-10"
     assert t[0]["visits"] == 1
+
+
+def test_company_partial_search(conn, master):
+    setup(conn, master)
+    today = date(2026, 10, 7)
+    codes = {i["code"] for i in stats.store_list(conn, today, company_q="ﾍﾞｰﾀ")}
+    assert codes == {"10003", "10004"}                     # 法人名の一部・半角カナでも絞れる
+    codes = {i["code"] for i in stats.store_list(conn, today, company_q="ベータ", q="支店")}
+    assert codes == {"10004"}                              # 法人 + 店舗名の組み合わせ

@@ -95,19 +95,23 @@ def _fold(s: str) -> str:
 
 def store_list(conn, today: date, q: str = "", rep: str | None = None, company: str | None = None,
                min_days: int | None = None, unvisited: bool = False, sort: str = "days",
-               order: str = "desc", mine_rep: str | None = None, limit: int | None = None) -> list[dict]:
+               order: str = "desc", mine_rep: str | None = None, limit: int | None = None,
+               company_q: str = "") -> list[dict]:
     rows = conn.execute(
         "SELECT s.code, s.company, s.name, s.rep_code, r.name rep_name, "
         "MAX(v.visit_date) last_visit, COUNT(v.id) visit_count "
         "FROM stores s LEFT JOIN sales_reps r ON r.code=s.rep_code "
         "LEFT JOIN visits v ON v.store_code=s.code WHERE s.active=1 GROUP BY s.code").fetchall()
     fq = _fold(q).strip()
+    fcq = _fold(company_q).strip()
     out = []
     for r in rows:
         d = dict(r)
         if rep and d["rep_code"] != rep:
             continue
         if company and d["company"] != company:
+            continue
+        if fcq and fcq not in _fold(d["company"]):
             continue
         if fq and fq not in _fold(d["code"] + " " + d["company"] + " " + d["name"]):
             continue

@@ -194,9 +194,9 @@ def put_settings(body: SettingsIn, u=Depends(admin_ok), conn=Depends(get_conn)):
 @app.get("/api/stores")
 def stores(q: str = "", rep: str | None = None, company: str | None = None, min_days: int | None = None,
            unvisited: bool = False, sort: str = "days", order: str = "desc", mine_first: bool = False,
-           limit: int | None = None, u=Depends(user_ok), conn=Depends(get_conn)):
+           limit: int | None = None, company_q: str = "", u=Depends(user_ok), conn=Depends(get_conn)):
     items = stats.store_list(conn, config.today_jst(), q, rep or None, company or None, min_days, unvisited,
-                             sort, order, u["rep_code"] if mine_first else None, limit)
+                             sort, order, u["rep_code"] if mine_first else None, limit, company_q)
     return {"items": items, "count": len(items)}
 
 

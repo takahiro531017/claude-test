@@ -190,7 +190,7 @@ async function vHome(el) {
 // ---------- 訪問入力 ----------
 async function vVisit(el, q) {
   const me = S.me, isAdmin = me.role === "admin";
-  let store = null, editing = null, seq = 0;
+  let store = null, editing = null, seq = 0, cq = "", sq = "";
   if (q.store) { try { const d = await api("/api/stores/" + encodeURIComponent(q.store)); store = d.store; } catch (e) { if (e.handled) return; } }
   el.innerHTML = `<h1 id="ttl">訪問を入力</h1><form class="card" id="f">
     <label class="f" for="d">訪問日</label><input id="d" type="date" required>
@@ -209,17 +209,19 @@ async function vVisit(el, q) {
       box.innerHTML = `<div class="sel"><div><div class="t">${esc(store.display_name)}</div><div class="muted small">${esc(store.company)} ・ ${esc(store.code)}</div></div><button type="button" class="btn sm" id="chg">変更</button></div>`;
       $("#chg").onclick = () => { store = null; renderStore(); };
     } else {
-      box.innerHTML = `<input id="sq" type="search" inputmode="search" placeholder="得意先名・店舗名・コードで検索" autocomplete="off"><div class="pick list" id="pick"></div>`;
+      box.innerHTML = `<input id="cq" type="search" list="colist" placeholder="① 法人名で絞り込み(例: ヤマダ)" autocomplete="off" aria-label="法人名で絞り込み" value="${esc(cq)}"><datalist id="colist">${S.meta.companies.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>
+        <input id="sq" type="search" inputmode="search" placeholder="② 店舗名・コードで検索" autocomplete="off" aria-label="店舗名またはコードで検索" style="margin-top:8px" value="${esc(sq)}"><div class="pick list" id="pick"></div>`;
       const run = async () => {
         const my = ++seq; const pick = $("#pick"); pick.innerHTML = `<div class="empty"><span class="spin"></span></div>`;
         try {
-          const d = await api("/api/stores" + qs({ q: $("#sq").value, mine_first: 1, limit: 30, sort: "company", order: "asc" }));
+          const d = await api("/api/stores" + qs({ q: $("#sq").value, company_q: $("#cq").value, mine_first: 1, limit: 30, sort: "company", order: "asc" }));
           if (my !== seq) return;
           pick.innerHTML = d.items.length ? d.items.map((s) => `<button type="button" class="item" data-c="${esc(s.code)}"><div><div class="t">${esc(s.display_name)}</div><div class="muted small">${esc(s.company)} ・ ${esc(s.code)}${s.rep_code === me.rep_code ? " ・ <b>担当</b>" : ""}</div></div><div class="r">${elapsedBadge(s)}</div></button>`).join("") : `<div class="empty">該当する店舗がありません</div>`;
           $$("[data-c]", pick).forEach((b) => (b.onclick = () => { store = d.items.find((x) => x.code === b.dataset.c); renderStore(); }));
         } catch (e) { if (!e.handled) pick.innerHTML = errBox(e); }
       };
-      let t; $("#sq").oninput = () => { clearTimeout(t); t = setTimeout(run, 200); };
+      let t; const inp = () => { cq = $("#cq").value; sq = $("#sq").value; clearTimeout(t); t = setTimeout(run, 200); };
+      $("#sq").oninput = inp; $("#cq").oninput = inp; $("#cq").onchange = inp;
       run();
     }
   }
