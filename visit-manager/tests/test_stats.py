@@ -108,3 +108,18 @@ def test_company_partial_search(conn, master):
     assert codes == {"10003", "10004"}                     # 法人名の一部・半角カナでも絞れる
     codes = {i["code"] for i in stats.store_list(conn, today, company_q="ベータ", q="支店")}
     assert codes == {"10004"}                              # 法人 + 店舗名の組み合わせ
+
+
+def test_rep_stores_counts(conn, master):
+    setup(conn, master)
+    add(conn, "2026-10-01", "10001", "R1")
+    add(conn, "2026-10-05", "10001", "R2")   # 他の営業が担当店舗を訪問
+    add(conn, "2026-10-03", "10002", "R1")
+    add(conn, "2026-09-20", "10003", "R1")   # 期間外
+    s, e = stats.month_range("2026-10")
+    d = stats.rep_stores(conn, s, e, "R1", date(2026, 10, 7))
+    by = {i["code"]: i for i in d["items"]}
+    assert set(by) == {"10001", "10002", "10003"}            # R1の担当店舗だけ
+    assert (by["10001"]["visits_all"], by["10001"]["visits_rep"]) == (2, 1)
+    assert by["10003"]["visits_all"] == 0 and by["10003"]["last_visit"] == "2026-09-20" and by["10003"]["days"] == 17
+    assert d["summary"] == {"assigned_stores": 3, "visited_stores": 2, "unvisited_stores": 1, "visits_all": 3, "visits_rep": 2}

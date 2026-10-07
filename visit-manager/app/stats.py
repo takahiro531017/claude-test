@@ -135,3 +135,25 @@ def store_list(conn, today: date, q: str = "", rep: str | None = None, company: 
     if mine_rep:
         out.sort(key=lambda x: x["rep_code"] != mine_rep)  # 安定ソート: 担当店舗を先頭へ
     return out[:limit] if limit else out
+
+
+def rep_stores(conn, start: date, end: date, rep: str, today: date) -> dict:
+    """営業の担当店舗ごとの訪問件数(期間内)。visits_all=その店舗への全員の訪問、visits_rep=うち担当本人の訪問。"""
+    a, b = start.isoformat(), end.isoformat()
+    rows = conn.execute(
+        "SELECT s.code, s.company, s.name, "
+        "(SELECT COUNT(*) FROM visits v WHERE v.store_code=s.code AND v.visit_date BETWEEN ? AND ?) visits_all, "
+        "(SELECT COUNT(*) FROM visits v WHERE v.store_code=s.code AND v.visit_date BETWEEN ? AND ? AND v.rep_code=?) visits_rep, "
+        "(SELECT MAX(v.visit_date) FROM visits v WHERE v.store_code=s.code) last_visit "
+        "FROM stores s WHERE s.active=1 AND s.rep_code=? ORDER BY s.company, s.name, s.code",
+        (a, b, a, b, rep, rep)).fetchall()
+    items = []
+    for r in rows:
+        d = dict(r)
+        d["display_name"] = d["name"] or d["company"]
+        d["days"] = (today - date.fromisoformat(d["last_visit"])).days if d["last_visit"] else None
+        items.append(d)
+    return {"items": items, "summary": {
+        "assigned_stores": len(items), "visited_stores": sum(1 for i in items if i["visits_all"] > 0),
+        "unvisited_stores": sum(1 for i in items if i["visits_all"] == 0),
+        "visits_all": sum(i["visits_all"] for i in items), "visits_rep": sum(i["visits_rep"] for i in items)}}

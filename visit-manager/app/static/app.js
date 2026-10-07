@@ -106,7 +106,7 @@ function renderChangePw(forced) {
 }
 
 // ---------- シェル ----------
-const NAV = [["/", "ホーム", "⌂"], ["/visit", "訪問入力", "＋", "fab"], ["/stores", "店舗", "▤"], ["/stats", "集計", "▥"]];
+const NAV = [["/", "ホーム", "⌂"], ["/visit", "訪問入力", "＋", "fab"], ["/stores", "店舗", "▤"], ["/reps", "営業", "☺"], ["/stats", "集計", "▥"]];
 function shell() {
   const admin = S.me.role === "admin";
   const links = (cls) => NAV.map(([h, l, ic, f]) => `<a href="#${h}" data-nav="${h}" class="${f || ""}"><span class="ic">${ic}</span><span>${l}</span></a>`).join("")
@@ -120,7 +120,7 @@ function shell() {
   $("#logout").onclick = out; $("#logout2").onclick = out;
 }
 function markNav(path) {
-  const key = path.startsWith("/store") ? "/stores" : path.startsWith("/visit") ? "/visit" : path.startsWith("/stats") ? "/stats" : path.startsWith("/admin") ? "/admin" : "/";
+  const key = /^\/reps?(\/|$)/.test(path) ? "/reps" : path.startsWith("/store") ? "/stores" : path.startsWith("/visit") ? "/visit" : path.startsWith("/stats") ? "/stats" : path.startsWith("/admin") ? "/admin" : "/";
   $$("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === key));
 }
 
@@ -142,6 +142,8 @@ async function route() {
       else if (path === "/stats" || path === "/stats/monthly") await vMonthly(el, q);
       else if (path === "/stats/rep") await vByRep(el, q);
       else if ((m = path.match(/^\/stats\/rep\/(.+)$/))) await vRepDetail(el, decodeURIComponent(m[1]), q);
+      else if (path === "/reps") await vReps(el, q);
+      else if ((m = path.match(/^\/rep\/(.+)$/))) await vRepStores(el, decodeURIComponent(m[1]), q);
       else if (path === "/admin") await vAdmin(el);
       else if (path === "/password") { renderChangePw(false); }
       else el.innerHTML = `<div class="empty">ページが見つかりません</div>`;
@@ -401,6 +403,54 @@ async function vRepDetail(el, code, q) {
   el.innerHTML = `<p><a href="#/stats/rep${qs(per)}">← 営業別</a></p><h1>${esc(rep ? rep.name : code)}</h1><p class="muted">${label}</p>${kpiRow(d.summary)}
     <h2>法人別の件数</h2><div class="card scroll"><table><thead><tr><th>法人</th><th class="n">訪問店舗数</th><th class="n">訪問回数</th><th class="n">担当店舗数</th></tr></thead><tbody>${d.companies.filter((c) => c.visits > 0).map((c) => `<tr><td>${esc(c.company)}</td><td class="n">${c.visited_stores}</td><td class="n">${c.visits}</td><td class="n">${c.assigned_stores}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">この期間の訪問はありません</td></tr>`}</tbody></table></div>
     <h2>訪問履歴</h2><div class="card scroll"><table><thead><tr><th>日付</th><th>店舗</th><th>メモ</th></tr></thead><tbody>${d.visits.map((v) => `<tr><td>${fmtDate(v.visit_date)}</td><td><a href="#/store/${encodeURIComponent(v.store_code)}">${esc(v.store_name || v.company)}</a><div class="muted small">${esc(v.company)}</div></td><td>${esc(v.memo)}</td></tr>`).join("") || `<tr><td colspan="3" class="empty">この期間の訪問はありません</td></tr>`}</tbody></table></div>`;
+}
+
+// ---------- 営業(一覧と、担当店舗ごとの訪問件数) ----------
+function periodBar(per, base, extra = {}) {
+  const isRange = !!per.start;
+  return `<div class="row" style="margin-bottom:10px"><div class="seg"><button id="pM" class="${isRange ? "" : "on"}">月</button><button id="pR" class="${isRange ? "on" : ""}">期間</button></div>
+    ${isRange ? `<input type="date" id="ps" value="${per.start}" style="width:auto"> 〜 <input type="date" id="pe" value="${per.end}" style="width:auto">`
+      : `<div class="monthnav"><button class="btn sm" id="pPv" aria-label="前月">◀</button><input type="month" id="pMo" value="${per.month}"><button class="btn sm" id="pNx" aria-label="翌月">▶</button></div>`}</div>`;
+}
+function bindPeriod(per, base, extra = {}) {
+  const go = (o) => (location.hash = "#" + base + qs({ ...extra, ...o }));
+  $("#pM").onclick = () => go({ month: S.meta.today.slice(0, 7) });
+  $("#pR").onclick = () => { const t = S.meta.today; go({ start: t.slice(0, 8) + "01", end: t }); };
+  if (per.start) { $("#ps").onchange = $("#pe").onchange = () => $("#ps").value && $("#pe").value && go({ start: $("#ps").value, end: $("#pe").value }); }
+  else { $("#pPv").onclick = () => go({ month: addMonths(per.month, -1) }); $("#pNx").onclick = () => go({ month: addMonths(per.month, 1) }); $("#pMo").onchange = (e) => e.target.value && go({ month: e.target.value }); }
+}
+const perLabel = (per) => (per.start ? `${fmtDate(per.start)} 〜 ${fmtDate(per.end)}` : fmtMonth(per.month));
+
+async function vReps(el, q) {
+  const per = periodQuery(q); const d = await api("/api/stats/by-rep" + qs(per));
+  el.innerHTML = `<h1>営業</h1>${periodBar(per, "/reps")}<p class="muted small">${perLabel(per)} ・ 営業を押すと、その人の担当店舗ごとの訪問件数が見られます。</p>
+    <div class="list">${d.reps.map((r) => `<a class="item" href="#/rep/${encodeURIComponent(r.rep_code)}${qs(per)}"><div style="min-width:0"><div class="t">${esc(r.rep_name)}${r.rep_code === S.me.rep_code ? ' <span class="badge b-green" style="white-space:nowrap">あなた</span>' : ""}</div>
+      <div class="muted small">担当 ${r.assigned_stores}店舗 ・ 訪問した店舗 ${r.stores} ・ 訪問率 ${pct(r.rate)}</div></div><div class="r"><div class="t" style="font-size:1.3rem">${r.visits}</div><div class="muted small">訪問回数</div></div></a>`).join("") || `<div class="empty">営業が登録されていません</div>`}</div>`;
+  bindPeriod(per, "/reps");
+}
+
+const RS = { sort: "visits_asc", only: "" };
+async function vRepStores(el, code, q) {
+  const per = periodQuery(q); const d = await api(`/api/reps/${encodeURIComponent(code)}/stores` + qs(per)); const sm = d.summary;
+  el.innerHTML = `<p><a href="#/reps${qs(per)}">← 営業の一覧</a></p><h1>${esc(d.rep.name)} の担当店舗</h1>${periodBar(per, "/rep/" + encodeURIComponent(code))}
+    <p class="muted small">${perLabel(per)}</p>
+    <div class="kpis">${kpi(sm.assigned_stores, "担当店舗数")}${kpi(sm.visited_stores, "訪問のあった店舗")}${kpi(sm.unvisited_stores, "訪問のない店舗")}${kpi(sm.visits_all, `訪問回数(本人 ${sm.visits_rep})`)}</div>
+    <div class="row" style="margin:14px 0 8px"><select id="rso" class="grow"><option value="visits_asc">訪問が少ない順</option><option value="visits_desc">訪問が多い順</option><option value="days">最終訪問が古い順</option><option value="company">得意先名順</option></select>
+      <select id="rsf" class="grow"><option value="">すべて</option><option value="none">訪問のない店舗のみ</option></select></div><div id="rsl"></div>
+    <p class="muted small">訪問回数 = その店舗への全員の訪問(期間内)。「本人」は、この営業自身の訪問です。</p>`;
+  $("#rso").value = RS.sort; $("#rsf").value = RS.only;
+  const draw = () => {
+    RS.sort = $("#rso").value; RS.only = $("#rsf").value;
+    let it = d.items.slice();
+    if (RS.only === "none") it = it.filter((i) => i.visits_all === 0);
+    const cmp = { visits_asc: (a, b) => a.visits_all - b.visits_all || a.company.localeCompare(b.company, "ja"), visits_desc: (a, b) => b.visits_all - a.visits_all || a.company.localeCompare(b.company, "ja"),
+      days: (a, b) => (b.days ?? 1e9) - (a.days ?? 1e9), company: (a, b) => a.company.localeCompare(b.company, "ja") || a.code.localeCompare(b.code) }[RS.sort];
+    it.sort(cmp);
+    $("#rsl").innerHTML = it.length ? `<div class="card scroll compact"><table><thead><tr><th>店舗</th><th class="n">訪問回数</th><th class="n">本人</th><th>最終訪問</th></tr></thead><tbody>${it.map((i) => `<tr><td><a href="#/store/${encodeURIComponent(i.code)}">${esc(i.display_name)}</a><div class="muted small">${esc(i.company)}</div></td>
+      <td class="n"><b>${i.visits_all}</b></td><td class="n">${i.visits_rep}</td><td>${i.last_visit ? fmtDate(i.last_visit) + "<div>" + elapsedBadge(i) + "</div>" : '<span class="badge b-gray">未訪問</span>'}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">条件に合う店舗がありません</div>`;
+  };
+  $("#rso").onchange = draw; $("#rsf").onchange = draw; draw();
+  bindPeriod(per, "/rep/" + encodeURIComponent(code));
 }
 
 // ---------- 管理 ----------

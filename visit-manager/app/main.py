@@ -359,6 +359,19 @@ def stats_rep(rep: str, month: str | None = None, start: str | None = None, end:
     return stats.rep_detail(conn, s, e, rep)
 
 
+@app.get("/api/reps/{rep}/stores")
+def rep_stores(rep: str, month: str | None = None, start: str | None = None, end: str | None = None,
+               u=Depends(user_ok), conn=Depends(get_conn)):
+    r = conn.execute("SELECT code, name FROM sales_reps WHERE code=?", (rep,)).fetchone()
+    if not r:
+        raise HTTPException(404, "営業が見つかりません")
+    s, e = _period(month, start, end)
+    d = stats.rep_stores(conn, s, e, rep, config.today_jst())
+    d["rep"] = dict(r)
+    d["start"], d["end"] = s.isoformat(), e.isoformat()
+    return d
+
+
 # ---------- 管理 ----------
 @app.post("/api/admin/import")
 def admin_import(file: UploadFile = File(...), u=Depends(admin_ok), conn=Depends(get_conn)):
