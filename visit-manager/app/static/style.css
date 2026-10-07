@@ -90,3 +90,35 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--gray-l)}
 pre.cred{background:var(--gray-l);padding:10px;border-radius:8px;overflow:auto}
 .bar{height:6px;border-radius:3px;background:var(--gray-l);margin-top:4px;min-width:60px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pri);border-radius:3px}
 @media (max-width:520px){.compact{padding:8px}.compact th,.compact td{padding:8px 4px;font-size:.85rem}}
+
+/* ---- 巡店月次報告(A4) ---- */
+.paper-wrap{overflow-x:auto;padding:4px}
+.paper{background:#fff;color:#111;width:210mm;max-width:none;min-height:297mm;margin:0 auto;padding:12mm 13mm;box-shadow:0 1px 8px rgba(0,0,0,.25);font-size:10pt;line-height:1.45;
+ --sub:#444;--line:#999;--gray-l:#eee}
+.paper h1,.paper h2{color:#111}
+.rp-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:8px}
+.rp-sub{font-size:9pt;color:#444}.rp-title{font-size:20pt;margin:0;letter-spacing:.15em;white-space:nowrap}
+.rp-meta{border-collapse:collapse;font-size:9pt}.rp-meta th{text-align:left;color:#444;padding:1px 8px 1px 0;font-weight:600;border:0}.rp-meta td{padding:1px 0;border:0}
+.paper section{margin-top:9px;break-inside:avoid}
+.paper h2{font-size:10.5pt;margin:0 0 3px;border-left:4px solid #111;padding-left:6px}
+.rp-t{width:100%;border-collapse:collapse;font-size:9pt}
+.rp-t th,.rp-t td{border:1px solid #666;padding:2px 5px;color:#111;vertical-align:middle}
+.rp-t thead th,.rp-sum tr:first-child th{background:#eee;font-weight:700;text-align:center;white-space:nowrap}
+.rp-t td.n{text-align:right;font-variant-numeric:tabular-nums}.rp-tot td{font-weight:700;background:#f3f3f3}
+.rp-sum td{text-align:center;font-size:14pt;font-weight:700;padding:4px}
+.rp-note{font-size:8pt;color:#444;margin:2px 0 0}
+.rp-chart svg{max-height:46mm;display:block}.paper .chart text{fill:#333;font-size:10px}.paper .legend{color:#333;font-size:8pt;margin:0}
+.rp-trend th,.rp-trend td{font-size:8pt;padding:1px 2px;text-align:right}.rp-trend tbody th{text-align:left;background:#eee}
+.rp-foot{display:flex;gap:10px;align-items:stretch}.rp-comment{flex:1}
+.rp-lines{height:26mm;border:1px solid #666;background:repeating-linear-gradient(transparent,transparent 6.4mm,#bbb 6.4mm,#bbb calc(6.4mm + 1px))}
+.rp-sign{width:62mm;border-collapse:collapse;font-size:8.5pt;align-self:flex-end}.rp-sign th,.rp-sign td{border:1px solid #666;text-align:center;width:33%}.rp-sign td{height:18mm}
+@page{size:A4 portrait;margin:8mm}
+@media print{
+ :root,:root[data-theme]{--bg:#fff;--card:#fff;--fg:#111;--text:#111;color-scheme:light}
+ html,body{background:#fff!important;color:#111!important}
+ .side,.bottom-nav,.topbar,.no-print,#toast,.modal-bg{display:none!important}
+ .main{margin:0!important;padding:0!important;max-width:none!important}
+ .paper-wrap{overflow:visible;padding:0}
+ .paper{box-shadow:none;width:auto;min-height:0;margin:0;padding:4mm 5mm}
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

@@ -130,7 +130,7 @@ async function route() {
   if (!$("#view")) shell();
   const h = location.hash.slice(1) || "/"; const [path, query] = h.split("?");
   const q = Object.fromEntries(new URLSearchParams(query || ""));
-  markNav(path); window.scrollTo(0, 0);
+  document.title = "営業訪問管理"; markNav(path); window.scrollTo(0, 0);
   const el = $("#view"); el.innerHTML = loading();
   const run = async () => {
     try {
@@ -142,6 +142,7 @@ async function route() {
       else if (path === "/stats" || path === "/stats/monthly") await vMonthly(el, q);
       else if (path === "/stats/rep") await vByRep(el, q);
       else if ((m = path.match(/^\/stats\/rep\/(.+)$/))) await vRepDetail(el, decodeURIComponent(m[1]), q);
+      else if (path === "/report") await vReport(el, q);
       else if (path === "/reps") await vReps(el, q);
       else if ((m = path.match(/^\/rep\/(.+)$/))) await vRepStores(el, decodeURIComponent(m[1]), q);
       else if (path === "/admin") await vAdmin(el);
@@ -188,7 +189,7 @@ async function vHome(el) {
     api("/api/stats/monthly" + qs({ month: ym0, rep })),
     api("/api/visits" + qs({ limit: 10 })),
     api("/api/stores" + qs({ min_days: S.meta.threshold_days, rep, sort: "days", order: "desc", limit: 5 }))]);
-  el.innerHTML = `<h1>ホーム</h1><a class="btn pri block" href="#/visit">＋ 訪問を入力する</a>
+  el.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><h1 style="margin:0">ホーム</h1><a class="btn" href="#/report?month=${thisYm}" id="printBtn">🖨 印刷(巡店月次報告)</a></div><a class="btn pri block" href="#/visit">＋ 訪問を入力する</a>
     <h2>${fmtMonth(ym0)}の${rep ? "あなたの" : "全体の"}実績</h2>${kpiRow(m.summary)}
     <div class="row" style="margin-top:18px;justify-content:space-between"><h2 style="margin:0">営業別の訪問件数</h2>
       <div class="seg"><button id="hm0" class="${HOME_MONTH === "this" ? "on" : ""}">今月</button><button id="hm1" class="${HOME_MONTH === "prev" ? "on" : ""}">先月</button></div></div>
@@ -403,6 +404,41 @@ async function vRepDetail(el, code, q) {
   el.innerHTML = `<p><a href="#/stats/rep${qs(per)}">← 営業別</a></p><h1>${esc(rep ? rep.name : code)}</h1><p class="muted">${label}</p>${kpiRow(d.summary)}
     <h2>法人別の件数</h2><div class="card scroll"><table><thead><tr><th>法人</th><th class="n">訪問店舗数</th><th class="n">訪問回数</th><th class="n">担当店舗数</th></tr></thead><tbody>${d.companies.filter((c) => c.visits > 0).map((c) => `<tr><td>${esc(c.company)}</td><td class="n">${c.visited_stores}</td><td class="n">${c.visits}</td><td class="n">${c.assigned_stores}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">この期間の訪問はありません</td></tr>`}</tbody></table></div>
     <h2>訪問履歴</h2><div class="card scroll"><table><thead><tr><th>日付</th><th>店舗</th><th>メモ</th></tr></thead><tbody>${d.visits.map((v) => `<tr><td>${fmtDate(v.visit_date)}</td><td><a href="#/store/${encodeURIComponent(v.store_code)}">${esc(v.store_name || v.company)}</a><div class="muted small">${esc(v.company)}</div></td><td>${esc(v.memo)}</td></tr>`).join("") || `<tr><td colspan="3" class="empty">この期間の訪問はありません</td></tr>`}</tbody></table></div>`;
+}
+
+// ---------- 巡店月次報告(A4印刷) ----------
+async function vReport(el, q) {
+  const ym = q.month || S.meta.today.slice(0, 7); const per = { month: ym };
+  const [m, br, over] = await Promise.all([
+    api("/api/stats/monthly" + qs({ month: ym })), api("/api/stats/by-rep" + qs(per)),
+    api("/api/stores" + qs({ min_days: S.meta.threshold_days, sort: "days", order: "desc", limit: 15 }))]);
+  const sm = m.summary, title = `巡店月次報告_${fmtMonth(ym)}`;
+  document.title = title;
+  const cos = m.companies.filter((c) => c.visits > 0), topCo = cos.slice(0, 15);
+  const th = S.meta.threshold_days;
+  el.innerHTML = `<div class="no-print"><p><a href="#/">← ホーム</a></p><div class="row" style="margin-bottom:10px"><div class="monthnav"><button class="btn sm" id="rPv" aria-label="前月">◀</button><input type="month" id="rMo" value="${ym}"><button class="btn sm" id="rNx" aria-label="翌月">▶</button></div>
+      <button class="btn pri" id="rPrint">🖨 印刷する(A4)</button></div>
+      <p class="muted small">印刷の画面で、用紙「A4」・向き「縦」・余白「既定」を選びます。「PDFに保存」も選べます。</p></div>
+    <div class="paper-wrap"><article class="paper report">
+      <header class="rp-head"><div><div class="rp-sub">営業部</div><h1 class="rp-title">巡店月次報告</h1></div>
+        <table class="rp-meta"><tr><th>対象月</th><td>${fmtMonth(ym)}</td></tr><tr><th>作成日</th><td>${fmtDate(S.meta.today)}</td></tr><tr><th>作成者</th><td>${esc(S.me.name)}</td></tr></table></header>
+      <section><h2>1. 実績サマリー</h2><table class="rp-t rp-sum"><tr><th>訪問回数</th><th>訪問した店舗数</th><th>訪問した法人数</th><th>担当店舗数</th><th>訪問率</th></tr>
+        <tr><td>${sm.visits}</td><td>${sm.stores}</td><td>${sm.companies}</td><td>${sm.assigned_stores}</td><td>${pct(sm.rate)}</td></tr></table></section>
+      <section><h2>2. 営業別の実績</h2><table class="rp-t"><thead><tr><th>営業</th><th class="n">訪問回数</th><th class="n">訪問店舗数</th><th class="n">担当店舗数</th><th class="n">未訪問店舗数</th><th class="n">訪問率</th></tr></thead><tbody>
+        ${br.reps.map((r) => `<tr><td>${esc(r.rep_name)}</td><td class="n">${r.visits}</td><td class="n">${r.stores}</td><td class="n">${r.assigned_stores}</td><td class="n">${r.assigned_stores - r.visited_assigned}</td><td class="n">${pct(r.rate)}</td></tr>`).join("")}
+        <tr class="rp-tot"><td>合計</td><td class="n">${br.total.visits}</td><td class="n">${br.total.stores}</td><td class="n">${br.total.assigned_stores}</td><td class="n">${br.total.assigned_stores - br.total.visited_assigned}</td><td class="n">${pct(br.total.rate)}</td></tr></tbody></table>
+        <p class="rp-note">未訪問店舗数 = 担当店舗のうち、対象月に訪問のなかった店舗。訪問率 = 訪問のあった担当店舗 ÷ 担当店舗数。</p></section>
+      <section><h2>3. 法人別の訪問(訪問回数の多い順${cos.length > topCo.length ? `・上位${topCo.length}法人` : ""})</h2>${topCo.length ? `<table class="rp-t"><thead><tr><th>法人(得意先名)</th><th class="n">訪問回数</th><th class="n">訪問店舗数</th><th class="n">担当店舗数</th></tr></thead><tbody>${topCo.map((c) => `<tr><td>${esc(c.company)}</td><td class="n">${c.visits}</td><td class="n">${c.visited_stores}</td><td class="n">${c.assigned_stores}</td></tr>`).join("")}</tbody></table>${cos.length > topCo.length ? `<p class="rp-note">ほか ${cos.length - topCo.length} 法人</p>` : ""}` : `<p class="rp-note">対象月の訪問はありません。</p>`}</section>
+      <section><h2>4. 直近12か月の推移</h2><div class="rp-chart">${barChart(m.trend)}</div><table class="rp-t rp-trend"><thead><tr><th></th>${m.trend.map((t) => `<th class="n">${Number(t.month.slice(5))}月</th>`).join("")}</tr></thead><tbody>
+        <tr><th>店舗数</th>${m.trend.map((t) => `<td class="n">${t.stores}</td>`).join("")}</tr><tr><th>法人数</th>${m.trend.map((t) => `<td class="n">${t.companies}</td>`).join("")}</tr><tr><th>訪問回数</th>${m.trend.map((t) => `<td class="n">${t.visits}</td>`).join("")}</tr></tbody></table></section>
+      <section><h2>5. 長期未訪問の店舗(${fmtDate(S.meta.today)}時点・${th}日以上・上位${over.items.length}件)</h2>${over.items.length ? `<table class="rp-t"><thead><tr><th>店舗</th><th>得意先名</th><th>担当</th><th>最終訪問日</th><th class="n">経過日数</th></tr></thead><tbody>${over.items.map((i) => `<tr><td>${esc(i.display_name)}</td><td>${esc(i.company)}</td><td>${esc(i.rep_name || "")}</td><td>${i.last_visit ? fmtDate(i.last_visit) : "未訪問"}</td><td class="n">${i.days === null ? "—" : i.days + "日"}</td></tr>`).join("")}</tbody></table>` : `<p class="rp-note">該当する店舗はありません。</p>`}</section>
+      <section class="rp-foot"><div class="rp-comment"><h2>6. 所見・特記事項</h2><div class="rp-lines"></div></div>
+        <table class="rp-sign"><tr><th>承認</th><th>確認</th><th>作成</th></tr><tr><td></td><td></td><td></td></tr></table></section>
+    </article></div>`;
+  const go = (mm) => (location.hash = "#/report" + qs({ month: mm }));
+  $("#rPv").onclick = () => go(addMonths(ym, -1)); $("#rNx").onclick = () => go(addMonths(ym, 1));
+  $("#rMo").onchange = (e) => e.target.value && go(e.target.value);
+  $("#rPrint").onclick = () => window.print();
 }
 
 // ---------- 営業(一覧と、担当店舗ごとの訪問件数) ----------
