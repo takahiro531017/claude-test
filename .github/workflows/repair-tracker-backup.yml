@@ -1,0 +1,34 @@
+# DB日次バックアップ(age暗号化)。Secrets に下記を設定した場合のみ動作します(未設定なら何もしません)。
+#   REPAIR_DATABASE_URL     … 接続文字列(Supabase の Session pooler 推奨。GitHub Actions は IPv4 のため)
+#   REPAIR_BACKUP_AGE_PUBKEY … age 公開鍵(秘密鍵は GitHub に置かず、会社の金庫/パスワード管理で保管)
+# 保存先は Actions の成果物(30日)。長期保管は社内ストレージへ別途コピーしてください(docs/運用マニュアル.md)。
+name: repair-tracker backup
+on:
+  schedule: [{ cron: '30 17 * * *' }]   # 毎日 02:30 JST
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 設定確認
+        id: chk
+        env: { URL: '${{ secrets.REPAIR_DATABASE_URL }}', KEY: '${{ secrets.REPAIR_BACKUP_AGE_PUBKEY }}' }
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "::notice::Secrets 未設定のためスキップ"; echo "run=no" >> "$GITHUB_OUTPUT"; else echo "run=yes" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.chk.outputs.run == 'yes'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-client-16
+      - if: steps.chk.outputs.run == 'yes'
+        working-directory: repair-tracker
+        env:
+          DATABASE_URL: ${{ secrets.REPAIR_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ secrets.REPAIR_BACKUP_AGE_PUBKEY }}
+        run: ./scripts/backup.sh "$RUNNER_TEMP/backup"
+      - if: steps.chk.outputs.run == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-db-backup-encrypted
+          path: ${{ runner.temp }}/backup/*.age
+          retention-days: 30

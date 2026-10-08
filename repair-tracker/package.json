@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src supabase/functions --ext .ts,.tsx",
+    "lint": "eslint src e2e tests --ext .ts,.tsx",
     "test": "vitest run",
     "test:db": "./scripts/db-test.sh",
     "test:e2e": "playwright test",

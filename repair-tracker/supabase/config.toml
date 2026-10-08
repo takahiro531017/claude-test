@@ -1,0 +1,49 @@
+# Supabase CLI 設定(ローカル開発 `supabase start` と、`supabase config push` での本番反映の両方に使う)
+# 本番プロジェクトは ap-northeast-1(東京)で作成すること。
+
+project_id = "repair-tracker"
+
+[api]
+schemas = ["public"]
+max_rows = 1000
+
+[auth]
+site_url = "http://localhost:5173"            # 本番では https://<自社ドメイン> に変更
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = false                          # 自己登録禁止(管理者の招待のみ)
+minimum_password_length = 12
+password_requirements = "lower_upper_letters_digits_symbols"
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+double_confirm_changes = true
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.rate_limit]                              # ブルートフォース対策(1時間あたり)
+sign_in_sign_ups = 30                          # 5分あたり・IPごとのサインイン/MFA検証試行
+token_verifications = 30
+email_sent = 30
+
+# 無操作/最長セッション(Supabase Pro プラン以上で有効)。アプリ側でも無操作ログアウトを実装済み。
+# [auth.sessions]
+# timebox = "12h"
+# inactivity_timeout = "30m"
+
+[storage]
+file_size_limit = "10MiB"
+
+[functions.pii-write]
+verify_jwt = true
+[functions.pii-reveal]
+verify_jwt = true
+[functions.csv-export]
+verify_jwt = true
+[functions.admin-users]
+verify_jwt = true

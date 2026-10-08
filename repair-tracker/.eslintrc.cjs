@@ -13,4 +13,8 @@ module.exports = {
       { object: 'window', property: 'localStorage' }, { object: 'window', property: 'sessionStorage' }],
     '@typescript-eslint/no-explicit-any': 'error',
   },
+  overrides: [
+    // テストはストレージ/コンソールに個人情報が残っていないことを検査するため参照を許可
+    { files: ['e2e/**', 'tests/**'], rules: { 'no-restricted-globals': 'off', 'no-console': 'off' } },
+  ],
 }

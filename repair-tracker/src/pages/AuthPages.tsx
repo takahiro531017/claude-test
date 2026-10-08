@@ -79,7 +79,6 @@ export function MfaEnroll() {
     e.preventDefault(); if (!factor) return
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.trim() })
     if (error) return setErr('コードが正しくありません。認証アプリの最新の6桁を入力してください')
-    await supabase.auth.refreshSession()
     await recheck()
   }
   return (
@@ -110,7 +109,6 @@ export function MfaVerify() {
     if (!f) return setErr('登録済みの認証アプリがありません。管理者に再設定を依頼してください')
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: f.id, code: code.trim() })
     if (error) return setErr('コードが正しくありません')
-    await supabase.auth.refreshSession()
     await recheck()
   }
   return (

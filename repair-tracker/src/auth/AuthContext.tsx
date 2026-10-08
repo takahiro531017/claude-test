@@ -27,12 +27,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [masters, setMasters] = useState<Masters>(empty)
   const needPw = useRef(arrivedViaLink)
   const loggedLogin = useRef(false)
+  const readyUser = useRef<string | null>(null)   // 準備完了済みのユーザー(重複イベントでの再読込を防ぐ)
 
   const refreshMasters = useCallback(async () => { setMasters(await loadMasters()) }, [])
 
   const evaluate = useCallback(async (s: Session | null) => {
     setSession(s)
-    if (!s) { setProfile(null); setPhase('signedOut'); loggedLogin.current = false; return }
+    if (!s) { setProfile(null); setPhase('signedOut'); loggedLogin.current = false; readyUser.current = null; return }
     if (needPw.current) { setPhase('setPassword'); return }
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
     if (aal?.currentLevel !== 'aal2') { setPhase(aal?.nextLevel === 'aal2' ? 'mfaVerify' : 'mfaEnroll'); return }
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(p as Profile)
     try { await refreshMasters() } catch { /* 画面側でエラー表示 */ }
     if (!loggedLogin.current) { loggedLogin.current = true; void logEvent('login') }
+    readyUser.current = s.user.id
     setPhase('ready')
   }, [refreshMasters])
 
@@ -49,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === 'PASSWORD_RECOVERY') needPw.current = true
       if (event === 'TOKEN_REFRESHED') { setSession(s); return }
+      if (event === 'INITIAL_SESSION') return                      // getSession() 側で処理済み
+      if (event === 'SIGNED_IN' && s && s.user.id === readyUser.current) return  // タブ復帰時などの重複通知
       // コールバック内で await する supabase 呼び出しはデッドロックし得るため setTimeout で逃がす
       setTimeout(() => void evaluate(s), 0)
     })
@@ -62,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const recheck = useCallback(async () => {
     needPw.current = false
+    readyUser.current = null
     const { data } = await supabase.auth.getSession()
     await evaluate(data.session)
   }, [evaluate])
