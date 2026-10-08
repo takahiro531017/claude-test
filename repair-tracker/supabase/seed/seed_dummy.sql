@@ -2,7 +2,7 @@
 -- 開発・検証専用ダミーデータ(本番では絶対に実行しないこと)
 --  - 氏名・電話・住所はすべて架空。実在の個人情報は含まない。
 --  - テストユーザーのパスワードは開発専用の固定値。本番には存在させない。
---  - 事前に seed_master.sql を実行しておくこと。
+--  - 事前に seed_master.sql を実行しておくこと。福岡支店(FUK)のみのデータを作成する。
 -- ============================================================================
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
@@ -19,10 +19,8 @@ select u.id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authentic
        '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
   from (values
     ('10000000-0000-0000-0000-000000000001'::uuid,'admin@example.test'),
-    ('10000000-0000-0000-0000-000000000002'::uuid,'hq@example.test'),
-    ('10000000-0000-0000-0000-000000000003'::uuid,'staff-spr@example.test'),
     ('10000000-0000-0000-0000-000000000004'::uuid,'staff-fuk@example.test'),
-    ('10000000-0000-0000-0000-000000000005'::uuid,'viewer-spr@example.test')) as u(id, email)
+    ('10000000-0000-0000-0000-000000000005'::uuid,'viewer-fuk@example.test')) as u(id, email)
 on conflict (id) do nothing;
 
 do $$ begin
@@ -36,10 +34,8 @@ end $$;
 
 insert into public.profiles(user_id, display_name, role, branch_id) values
   ('10000000-0000-0000-0000-000000000001','管理者(テスト)','admin',null),
-  ('10000000-0000-0000-0000-000000000002','本社閲覧(テスト)','hq_viewer',null),
-  ('10000000-0000-0000-0000-000000000003','札幌担当(テスト)','branch_staff',(select id from branches where code='SPR')),
   ('10000000-0000-0000-0000-000000000004','福岡担当(テスト)','branch_staff',(select id from branches where code='FUK')),
-  ('10000000-0000-0000-0000-000000000005','札幌閲覧(テスト)','branch_viewer',(select id from branches where code='SPR'))
+  ('10000000-0000-0000-0000-000000000005','福岡閲覧(テスト)','branch_viewer',(select id from branches where code='FUK'))
 on conflict (user_id) do nothing;
 
 insert into public.dealers(code, name) values
@@ -47,19 +43,18 @@ insert into public.dealers(code, name) values
   ('D004','架空ホームプラザ'),('D005','見本でんきの店')
 on conflict (code) do nothing;
 
--- 30件(拠点・ステータス・日付を散らし、滞留アラートも発生させる)
+-- 30件(福岡支店。ステータス・日付を散らし、滞留アラートも発生させる)
 do $$
 declare
   i int; r_id uuid; b smallint; m int; d int; st text; days_ago int;
-  branches_n int := (select count(*) from branches);
-  mk_n int := (select count(*) from manufacturers);
+    mk_n int := (select count(*) from manufacturers);
   statuses text[] := array['received','sent_to_maker','in_repair','returned_from_maker','returned_to_dealer','completed','on_hold','quote_pending','unrepairable','cancelled'];
   products text[] := array['ドラム式洗濯機','冷蔵庫','電子レンジ','炊飯器','エアコン','掃除機','液晶テレビ','ドライヤー'];
   surnames text[] := array['架空','見本','試験','仮名','例示'];
-  staff uuid[] := array['10000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001']::uuid[];
+  staff uuid[] := array['10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001']::uuid[];
 begin
   for i in 1..30 loop
-    b := (select id from branches order by id offset ((i - 1) % branches_n) limit 1);
+    b := (select id from branches where code = 'FUK');
     m := (select id from manufacturers order by id offset ((i - 1) % mk_n) limit 1);
     d := (select id from dealers order by id offset ((i - 1) % 5) limit 1);
     st := statuses[1 + ((i - 1) % 10)];
@@ -72,7 +67,7 @@ begin
            m, products[1 + (i % 8)], 'MODEL-' || lpad(i::text, 3, '0'), 'DUMMY-SN-' || lpad(i::text, 5, '0'),
            current_date - days_ago - 300, i % 3 <> 0, i % 2 = 0,
            '["電源コード","取扱説明書"]'::jsonb, '電源が入らない(ダミー症状 ' || i || ')', '目立つ傷なし(ダミー)',
-           staff[1 + (i % 3)],
+           staff[1 + (i % 2)],
            case when i % 3 = 0 then surnames[1 + (i % 5)] || ' ○○' end,
            case when i % 3 = 0 then '000-****-' || lpad(i::text, 4, '0') end,
            (i % 3 = 0)

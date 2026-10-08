@@ -31,7 +31,7 @@ export default function Dashboard() {
           <Link key={s} to={`/repairs?status=${s}`} className="card"><span className="num">{byStatus.get(s) ?? 0}</span><StatusBadge status={s} /></Link>
         ))}
       </section>
-      <section>
+      {masters.branches.length > 1 && <section>
         <h2>拠点別件数</h2>
         <table className="tbl"><thead><tr><th>拠点</th><th>全件</th><th>対応中</th><th>完了</th></tr></thead>
           <tbody>{masters.branches.map((b) => {
@@ -39,7 +39,7 @@ export default function Dashboard() {
             const done = mine.filter((r) => r.status === 'completed' || r.status === 'cancelled').length
             return <tr key={b.id}><td><Link to={`/repairs?branch=${b.id}`}>{b.name}</Link></td><td>{mine.length}</td><td>{mine.length - done}</td><td>{done}</td></tr>
           })}</tbody></table>
-      </section>
+      </section>}
       <section>
         <h2>滞留アラート <small>(メーカー発送後{masters.settings.stale_sent_days}日超 / 返却受領後{masters.settings.stale_return_days}日超で未返送)</small></h2>
         {alerts.length === 0 ? <Banner kind="ok">滞留している案件はありません。</Banner> : (

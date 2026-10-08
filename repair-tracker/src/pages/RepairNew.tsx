@@ -17,12 +17,15 @@ export default function RepairNew() {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [ack, setAck] = useState(false)
+  // 有効な拠点が1つだけ(福岡のみ運用)なら、拠点選択を省略して自動で使う
+  const activeBranches = masters.branches.filter((b) => b.active)
+  const branchId = v.branch_id ?? (activeBranches.length === 1 ? activeBranches[0].id : undefined)
 
   if (profile?.role !== 'admin' && profile?.role !== 'branch_staff') return <Banner kind="warn">新規受付の権限がありません。</Banner>
 
   const checkSerial = async () => {
-    if (!v.serial_no || !v.branch_id) return setWarn([])
-    const w = await serialWarnings(v.serial_no, v.branch_id)
+    if (!v.serial_no || !branchId) return setWarn([])
+    const w = await serialWarnings(v.serial_no, branchId)
     const msgs: string[] = []
     if (w.sameBranch.length) msgs.push(`同じシリアル番号が自拠点に登録済みです: ${w.sameBranch.join(', ')}`)
     if (w.elsewhere) msgs.push('同じシリアル番号が他拠点に登録されています(二重受付の可能性)')
@@ -38,11 +41,11 @@ export default function RepairNew() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setErr('')
-    if (!v.branch_id) return setErr('受付拠点を選択してください')
+    if (!branchId) return setErr('受付拠点を選択してください')
     if (warn.length && !ack) return setErr('重複の警告を確認し、「確認した」にチェックしてください')
     setBusy(true)
     try {
-      const r = await createRepair({ ...v, branch_id: v.branch_id })
+      const r = await createRepair({ ...v, branch_id: branchId })
       const failures: string[] = []
       if (pii.name || pii.phone || pii.address) {
         try { await writePii(r.id, { name: pii.name || undefined, phone: pii.phone || undefined, address: pii.address || undefined }) } catch { failures.push('エンドユーザー情報') }
@@ -55,8 +58,8 @@ export default function RepairNew() {
   return (
     <form onSubmit={submit} className="stack">
       <h1>新規受付</h1>
-      <p className="hint">管理番号は保存時に自動採番されます(例: SPR-20261008-001)。* は必須です。</p>
-      {profile.role === 'admin' && (
+      <p className="hint">管理番号は保存時に自動採番されます(例: FUK-20261008-001)。* は必須です。</p>
+      {profile.role === 'admin' && activeBranches.length > 1 && (
         <Field label="受付拠点" required><select required value={v.branch_id ?? ''} onChange={(e) => setV({ ...v, branch_id: Number(e.target.value) })}>
           <option value="">選択してください</option>{masters.branches.filter((b) => b.active).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>)}
       <RepairForm value={v} onChange={(p) => setV((o) => ({ ...o, ...p }))} sections={['basic', 'dealer', 'product']} onSerialBlur={() => void checkSerial()} />

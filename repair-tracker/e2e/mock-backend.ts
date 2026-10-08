@@ -22,7 +22,7 @@ export function makeRepair(over: Record<string, unknown> = {}) {
 export type Mock = { calls: { method: string; url: string; body: string }[]; repairs: ReturnType<typeof makeRepair>[]; conflictOnRpc: boolean }
 
 /** Supabase(Auth / PostgREST / Functions)の最小モック */
-export async function mockBackend(page: Page, role: Role = 'branch_staff'): Promise<Mock> {
+export async function mockBackend(page: Page, role: Role = 'branch_staff', opts: { singleBranch?: boolean } = {}): Promise<Mock> {
   const uid = 'u1'
   let aal: 'aal1' | 'aal2' = 'aal1' // MFA確認後は以降のトークン更新でも維持される(実サーバーと同じ)
   const mock: Mock = { calls: [], repairs: [makeRepair()], conflictOnRpc: false }
@@ -47,7 +47,9 @@ export async function mockBackend(page: Page, role: Role = 'branch_staff'): Prom
     if (/\/factors\/f1\/verify$/.test(p)) { aal = 'aal2'; return send(200, session('aal2')) }
     if (p === '/auth/v1/logout') return route.fulfill({ status: 204, headers: cors })
     if (p === '/rest/v1/profiles') return rows(url.searchParams.has('user_id') ? [profile] : [profile])
-    if (p === '/rest/v1/branches') return send(200, [{ id: 1, code: 'SPR', name: '札幌支店', active: true }, { id: 2, code: 'FUK', name: '福岡支店', active: true }])
+    if (p === '/rest/v1/branches') return send(200, opts.singleBranch
+      ? [{ id: 1, code: 'FUK', name: '福岡支店', active: true }]
+      : [{ id: 1, code: 'SPR', name: '札幌支店', active: true }, { id: 2, code: 'FUK', name: '福岡支店', active: true }])
     if (p === '/rest/v1/manufacturers') return send(200, [{ id: 1, name: 'パナソニック', active: true }])
     if (p === '/rest/v1/dealers') return send(200, [{ id: 1, code: 'D002', name: 'テスト家電センター', active: true }])
     if (p === '/rest/v1/settings') return send(200, [{ key: 'stale_sent_days', value: '14' }, { key: 'stale_return_days', value: '7' }, { key: 'retention_years', value: '3' }, { key: 'session_timeout_min', value: '30' }])

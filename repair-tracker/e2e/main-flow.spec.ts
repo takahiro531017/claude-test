@@ -85,3 +85,21 @@ test('管理画面は管理者のみ', async ({ page }) => {
   await page.goto('/admin')
   await expect(page.getByRole('heading', { name: 'ダッシュボード' })).toBeVisible()
 })
+
+test('福岡のみ(拠点が1つ)の運用: 拠点別件数・拠点フィルタ・拠点選択を表示しない', async ({ page }) => {
+  await mockBackend(page, 'admin', { singleBranch: true })
+  await login(page)
+  await expect(page.getByRole('heading', { name: /ダッシュボード/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '拠点別件数' })).toHaveCount(0)
+  await page.getByRole('link', { name: '修理品一覧' }).click()
+  await expect(page.getByLabel('拠点', { exact: true })).toHaveCount(0)
+  await page.getByRole('link', { name: '新規受付' }).click()
+  await expect(page.getByRole('heading', { name: '新規受付' })).toBeVisible()
+  await expect(page.getByText('受付拠点')).toHaveCount(0)
+})
+
+test('複数拠点のときは拠点別件数を表示する(将来の拡大時)', async ({ page }) => {
+  await mockBackend(page, 'admin')
+  await login(page)
+  await expect(page.getByRole('heading', { name: '拠点別件数' })).toBeVisible()
+})

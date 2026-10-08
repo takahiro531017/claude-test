@@ -27,7 +27,7 @@ export default function RepairList() {
   const set = (k: string, v: string) => { const n = new URLSearchParams(sp); if (v) n.set(k, v); else n.delete(k); setSp(n, { replace: true }) }
   const shown = useMemo(() => staleOnly ? rows.filter((r) => staleReason(r, masters.settings)) : rows, [rows, staleOnly, masters.settings])
   const branchName = (id: number) => masters.branches.find((b) => b.id === id)?.name ?? ''
-  const showBranchFilter = profile?.role === 'admin' || profile?.role === 'hq_viewer'
+  const showBranchFilter = (profile?.role === 'admin' || profile?.role === 'hq_viewer') && masters.branches.length > 1
   const canExport = profile?.role !== 'branch_viewer'
 
   const download = async () => {
