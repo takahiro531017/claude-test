@@ -123,3 +123,7 @@ begin
     alter publication supabase_realtime add table public.repairs, public.status_history;
   end if;
 end $$;
+
+-- service_role(Edge Function)専用の実行権限
+grant execute on function public.write_audit(text, uuid, jsonb, uuid), public.purge_expired_pii(),
+  public.next_mgmt_no(smallint, date) to service_role;

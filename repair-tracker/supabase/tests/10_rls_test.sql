@@ -1,10 +1,13 @@
 -- RLS/トリガー/監査の自動テスト(失敗すると例外で停止)
 create schema t;
 grant usage on schema t to authenticated;
-create function t.login(u uuid) returns void language plpgsql as $$
-begin perform set_config('request.jwt.claim.sub', u::text, false); execute 'set role authenticated'; end $$;
+create function t.login(u uuid, aal text default 'aal2') returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', u, 'aal', aal)::text, false);
+  execute 'set role authenticated';
+end $$;
 create function t.logout() returns void language plpgsql as $$
-begin execute 'reset role'; perform set_config('request.jwt.claim.sub', '', false); end $$;
+begin execute 'reset role'; perform set_config('request.jwt.claims', '', false); end $$;
 create function t.eq(a anyelement, b anyelement, label text) returns void language plpgsql as $$
 begin
   if a is distinct from b then raise exception 'FAIL [%]: 期待 % / 実際 %', label, b, a; end if;
@@ -71,6 +74,9 @@ begin
   perform t.login(hq);   perform t.eq((select count(*)::int from repairs), 3, '本社閲覧者は全拠点閲覧'); perform t.logout();
   perform t.login(admin_); perform t.eq((select count(*)::int from repairs), 3, 'adminは全拠点閲覧'); perform t.logout();
   perform t.login(gone); perform t.eq((select count(*)::int from repairs), 0, '無効化ユーザーは何も見えない'); perform t.logout();
+  perform t.login(admin_, 'aal1'); perform t.eq((select count(*)::int from repairs), 0, 'MFA未通過(aal1)ではadminでも何も見えない');
+  perform t.fails(format($q$insert into repairs(branch_id,dealer_name,manufacturer_id,product_name,symptom) values (%s,'x',%s,'y','z')$q$, b_spr, mk), 'MFA未通過では登録不可');
+  perform t.eq((select count(*)::int from profiles), 0, 'MFA未通過ではプロファイルも見えない'); perform t.logout();
 
   -- 3. 書込権限 -------------------------------------------------------
   perform t.login(vw);

@@ -1,14 +1,18 @@
 -- ヘルパー関数・トリガー
 
--- 現在のユーザーのロール/拠点(無効ユーザーは null = 何も見えない)
+-- MFA(TOTP)を通過したセッション(aal2)かどうか。DBレベルでMFAを強制する。
+create function public.mfa_ok() returns boolean
+language sql stable as $$ select coalesce(auth.jwt() ->> 'aal', '') = 'aal2' $$;
+
+-- 現在のユーザーのロール/拠点(無効ユーザー・MFA未通過は null = 何も見えない/できない)
 create function public.app_role() returns public.user_role
 language sql stable security definer set search_path = public as $$
-  select role from public.profiles where user_id = auth.uid() and active
+  select role from public.profiles where user_id = auth.uid() and active and public.mfa_ok()
 $$;
 
 create function public.app_branch() returns smallint
 language sql stable security definer set search_path = public as $$
-  select branch_id from public.profiles where user_id = auth.uid() and active
+  select branch_id from public.profiles where user_id = auth.uid() and active and public.mfa_ok()
 $$;
 
 -- ---------- 監査ログ ----------
