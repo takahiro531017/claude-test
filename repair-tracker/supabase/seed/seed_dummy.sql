@@ -4,16 +4,35 @@
 --  - テストユーザーのパスワードは開発専用の固定値。本番には存在させない。
 --  - 事前に seed_master.sql を実行しておくこと。
 -- ============================================================================
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
--- テストユーザー(各ロール)
-insert into auth.users(id, email) values
-  ('10000000-0000-0000-0000-000000000001','admin@example.test'),
-  ('10000000-0000-0000-0000-000000000002','hq@example.test'),
-  ('10000000-0000-0000-0000-000000000003','staff-spr@example.test'),
-  ('10000000-0000-0000-0000-000000000004','staff-fuk@example.test'),
-  ('10000000-0000-0000-0000-000000000005','viewer-spr@example.test')
+-- テストユーザー(各ロール)。ローカルの Supabase でログインできる形式(開発専用パスワード)で作成する。
+--   パスワード: DevOnly-Passw0rd!   ※本番に存在させない。ログイン後、TOTP(MFA)の登録が必要。
+--   ※ Supabase の内部テーブル構造はバージョンで変わる。失敗する場合は、ダッシュボード/`supabase start` の
+--     Studio からユーザーを作成し、下の profiles の user_id だけ合わせればよい。
+insert into auth.users(id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+                       raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+                       confirmation_token, recovery_token, email_change_token_new, email_change)
+select u.id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', u.email,
+       extensions.crypt('DevOnly-Passw0rd!', extensions.gen_salt('bf')), now(),
+       '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', ''
+  from (values
+    ('10000000-0000-0000-0000-000000000001'::uuid,'admin@example.test'),
+    ('10000000-0000-0000-0000-000000000002'::uuid,'hq@example.test'),
+    ('10000000-0000-0000-0000-000000000003'::uuid,'staff-spr@example.test'),
+    ('10000000-0000-0000-0000-000000000004'::uuid,'staff-fuk@example.test'),
+    ('10000000-0000-0000-0000-000000000005'::uuid,'viewer-spr@example.test')) as u(id, email)
 on conflict (id) do nothing;
+
+do $$ begin
+  if to_regclass('auth.identities') is not null then
+    insert into auth.identities(id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+    select gen_random_uuid(), u.id::text, u.id, jsonb_build_object('sub', u.id::text, 'email', u.email), 'email', now(), now(), now()
+      from auth.users u where u.email like '%@example.test'
+       and not exists (select 1 from auth.identities i where i.user_id = u.id);
+  end if;
+end $$;
 
 insert into public.profiles(user_id, display_name, role, branch_id) values
   ('10000000-0000-0000-0000-000000000001','管理者(テスト)','admin',null),

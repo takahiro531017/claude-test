@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "baseUrl": ".",
+    "paths": { "https://esm.sh/@supabase/supabase-js@2.117.3": ["node_modules/@supabase/supabase-js"] }
+  },
+  "include": ["supabase/functions/**/*.ts"]
+}
