@@ -7,7 +7,7 @@ module.exports = {
   ignorePatterns: ['dist', 'node_modules', 'supabase/functions/**'],
   rules: {
     // 個人情報の漏洩防止: console出力とlocalStorage/sessionStorage直接利用を禁止
-    'no-console': ['error', { allow: [] }],
+    'no-console': 'error',
     'no-restricted-globals': ['error', 'localStorage', 'sessionStorage'],
     'no-restricted-properties': ['error',
       { object: 'window', property: 'localStorage' }, { object: 'window', property: 'sessionStorage' }],
