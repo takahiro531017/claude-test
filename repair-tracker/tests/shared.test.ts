@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decryptField, encryptField, keyRingFromEnv, keyVersionOf } from '../supabase/functions/_shared/crypto'
+import { decryptField, encryptField, keyRingFromEnv, keyVersionOf, reencryptField } from '../supabase/functions/_shared/crypto'
 import { maskName, maskPhone } from '../supabase/functions/_shared/mask'
 import { csvCell, isEmail, isUuid } from '../supabase/functions/_shared/validate'
 
@@ -32,6 +32,18 @@ describe('暗号化 (AES-256-GCM)', () => {
     const ring2 = keyRingFromEnv(env({ PII_KEYS: JSON.stringify({ 1: k1, 2: k2 }), PII_KEY_CURRENT: '2' }))
     expect(await decryptField(ring2, old, 'a')).toBe('旧データ')
     expect(keyVersionOf(await encryptField(ring2, 'n', 'a'))).toBe(2)
+  })
+  it('再暗号化: 新鍵に切り替わり、平文は変わらず、AADも維持される', async () => {
+    const r1 = keyRingFromEnv(env({ PII_KEYS: JSON.stringify({ 1: k1 }), PII_KEY_CURRENT: '1' }))
+    const r2 = keyRingFromEnv(env({ PII_KEYS: JSON.stringify({ 1: k1, 2: k2 }), PII_KEY_CURRENT: '2' }))
+    const old = await encryptField(r1, '住所テスト', 'r9:addr')
+    const neu = await reencryptField(r2, old, 'r9:addr')
+    expect(keyVersionOf(neu)).toBe(2)
+    expect(await decryptField(r2, neu, 'r9:addr')).toBe('住所テスト')
+    await expect(decryptField(r2, neu, 'r8:addr')).rejects.toThrow()
+    // 旧鍵を取り除いたリングでも新暗号文は復号できる(=旧鍵の廃棄が可能)
+    const r2only = keyRingFromEnv(env({ PII_KEYS: JSON.stringify({ 2: k2 }), PII_KEY_CURRENT: '2' }))
+    expect(await decryptField(r2only, neu, 'r9:addr')).toBe('住所テスト')
   })
   it('鍵未設定・不正長の鍵はエラー', async () => {
     expect(() => keyRingFromEnv(env({}))).toThrow()

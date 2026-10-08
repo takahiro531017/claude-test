@@ -50,7 +50,7 @@ declare
   b_spr smallint := (select id from branches where code='SPR');
   b_fuk smallint := (select id from branches where code='FUK');
   mk int := (select id from manufacturers limit 1);
-  r1 uuid; r2 uuid; r3 uuid; v int; n int; m1 text; m2 text; today text := to_char((now() at time zone 'Asia/Tokyo')::date,'YYYYMMDD');
+  r1 uuid; r2 uuid; r3 uuid; r4 uuid; v int; n int; m1 text; m2 text; today text := to_char((now() at time zone 'Asia/Tokyo')::date,'YYYYMMDD');
 begin
   -- 1. 採番 -----------------------------------------------------------
   perform t.login(spr);
@@ -210,6 +210,32 @@ begin
   perform t.eq(serial_exists_elsewhere('SN-001'), true, '他拠点の同一シリアルを警告(詳細は返さない)');
   perform t.eq(serial_exists_elsewhere('NOPE'), false, '未登録シリアルは警告なし');
   perform t.logout();
+
+  -- 10b. ストレージ(写真)の権限 --------------------------------------
+  perform t.eq((select public from storage.buckets where id='repair-files'), false, 'バケットは非公開');
+  perform t.eq((select file_size_limit from storage.buckets where id='repair-files'), 10485760::bigint, 'バケットのサイズ上限10MB');
+  perform t.login(spr);
+  perform t.eq(t.rows(format($q$insert into storage.objects(bucket_id, name) values ('repair-files', '%s/a.jpg')$q$, r1)), 1, '自拠点案件への写真アップロード可');
+  perform t.fails(format($q$insert into storage.objects(bucket_id, name) values ('repair-files', '%s/a.jpg')$q$, gen_random_uuid()), '存在しない/見えない案件への保存は不可');
+  perform t.eq((select count(*)::int from storage.objects where bucket_id='repair-files'), 1, '自拠点の写真は閲覧可');
+  perform t.logout();
+  perform t.login(fuk);   -- 他拠点(福岡)の案件を新規作成し、その写真を保存
+  insert into repairs(branch_id, dealer_name, manufacturer_id, product_name, symptom) values (b_fuk,'福岡販売店',mk,'掃除機','吸引力低下') returning id into r4;
+  perform t.logout();
+  insert into storage.objects(bucket_id, name) values ('repair-files', r4::text || '/z.jpg');
+  perform t.login(spr);
+  perform t.eq((select count(*)::int from storage.objects where bucket_id='repair-files' and name like r4::text || '%'), 0, '他拠点の写真は見えない');
+  perform t.logout();
+  perform t.login(vw);
+  perform t.fails(format($q$insert into storage.objects(bucket_id, name) values ('repair-files', '%s/v.jpg')$q$, r1), 'viewerは写真アップロード不可');
+  perform t.eq((select count(*)::int from storage.objects where bucket_id='repair-files'), 1, 'viewerは自拠点の写真を閲覧のみ可');
+  perform t.logout();
+  perform t.login(hq);
+  perform t.eq((select count(*)::int from storage.objects where bucket_id='repair-files'), 2, 'hq_viewerは全拠点の写真を閲覧可');
+  perform t.fails(format($q$insert into storage.objects(bucket_id, name) values ('repair-files', '%s/h.jpg')$q$, r1), 'hq_viewerは写真アップロード不可');
+  perform t.logout();
+  perform t.eq((select count(*)::int from pg_publication_tables where pubname='supabase_realtime' and tablename in ('repairs','status_history')), 2, 'Realtime配信対象は repairs / status_history のみ(個人情報テーブルを含まない)');
+  perform t.eq((select count(*)::int from pg_publication_tables where pubname='supabase_realtime' and tablename in ('repair_pii','audit_log')), 0, 'Realtimeに暗号文・監査ログを流さない');
 
   -- 11. 個人情報の匿名化バッチ ----------------------------------------
   update repairs set completed_on = current_date - interval '4 years', status = 'completed',

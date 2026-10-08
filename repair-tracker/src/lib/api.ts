@@ -105,7 +105,10 @@ export const resetMfa = (userId: string) => invoke<{ ok: true }>('admin-users', 
 export async function exportCsv(filters: Record<string, unknown>, includePii: boolean): Promise<Blob> {
   const { data, error } = await supabase.functions.invoke('csv-export', { body: { filters, include_pii: includePii } })
   if (error) throw fail('CSV出力に失敗しました')
-  return data instanceof Blob ? data : new Blob([data as string], { type: 'text/csv;charset=utf-8' })
+  // Response.text() は先頭のBOMを取り除くため、Excelで文字化けしないよう付け直す
+  if (data instanceof Blob) return data
+  const text = (data as string).startsWith('\uFEFF') ? (data as string) : '\uFEFF' + (data as string)
+  return new Blob([text], { type: 'text/csv;charset=utf-8' })
 }
 
 // ---- ファイル ----

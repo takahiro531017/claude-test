@@ -49,3 +49,8 @@ export function keyVersionOf(stored: string): number {
   const m = /^v(\d+):/.exec(stored)
   return m ? Number(m[1]) : 0
 }
+
+/** 鍵ローテーション用: 旧鍵で復号 → 現在の鍵で再暗号化 */
+export async function reencryptField(ring: KeyRing, stored: string, aad: string): Promise<string> {
+  return encryptField(ring, await decryptField(ring, stored, aad), aad)
+}

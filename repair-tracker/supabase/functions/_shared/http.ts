@@ -1,5 +1,5 @@
 // 共通: CORS・認証(JWT + MFA aal2 必須)・エラー応答
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.117.3'
 import type { Role } from './validate.ts'
 
 export const ALLOWED_ORIGIN = () => Deno.env.get('ALLOWED_ORIGIN') ?? ''
