@@ -23,7 +23,7 @@ const call = (name: string, body: unknown, who?: string, aal?: string) => handle
   method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://app.example.test', ...(who ? { authorization: `Bearer ${tok(who, aal)}` } : {}) }, body: JSON.stringify(body) }))
 
 beforeAll(async () => {
-  for (const n of ['pii-write', 'pii-reveal', 'csv-export', 'admin-users']) { current = n; await import(`../supabase/functions/${n}/index.ts`) }
+  for (const n of ['pii-write', 'pii-reveal', 'csv-export', 'admin-users']) { current = n; await import(process.env.BUNDLED ? `../supabase/functions-bundled/${n}.ts` : `../supabase/functions/${n}/index.ts`) }
 })
 beforeEach(() => {
   failures.audit = false; invited.length = 0; deletedUsers.length = 0
