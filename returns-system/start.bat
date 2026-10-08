@@ -1,18 +1,23 @@
 @echo off
-chcp 65001 > nul
-cd /d %~dp0
-if not exist .venv\Scripts\python.exe (
-  echo 初回の準備をしています。数分かかります...
-  python -m venv .venv || goto :err
-  .venv\Scripts\python -m pip install -r requirements.txt || goto :err
-)
+cd /d "%~dp0"
+echo === Returns system ===
+if exist ".venv\Scripts\python.exe" goto run
+echo First-time setup. Please wait a few minutes...
+python -m venv .venv
+if errorlevel 1 goto err
+".venv\Scripts\python.exe" -m pip install -r requirements.txt
+if errorlevel 1 goto err
+:run
 echo.
-echo 起動しました。この黒い画面を閉じるとアプリが止まります。
-echo パソコンのブラウザで http://localhost:8000 を開いてください。
-.venv\Scripts\python run.py
+echo Started. Do NOT close this window.
+echo Open http://localhost:8000 in your browser.
+echo.
+".venv\Scripts\python.exe" run.py
+echo.
+echo The app has stopped. Please read the messages above.
 pause
 exit /b
 :err
 echo.
-echo 準備に失敗しました。上に出ている文字を、そのままコピーして伝えてください。
+echo Setup FAILED. Please copy the messages above and send them to me.
 pause
