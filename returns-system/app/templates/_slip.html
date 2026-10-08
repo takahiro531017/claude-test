@@ -1,0 +1,17 @@
+<article class="slip">
+  <header><span class="t">返品受付票</span><span class="d">{{ s.received_on | ymd }}</span></header>
+  <div class="head">
+    <div class="no"><small>受付番号</small><b>{{ s.receipt_no }}</b>
+      <div class="qd"><div><small>数量</small><strong>{{ s.quantity }} 個</strong></div>
+        <div><small>担当者</small><span>{{ s.staff }}</span></div></div>
+    </div>
+    <div class="qr"><div class="qrbox">{{ qr | safe }}</div><small>スマホで読み取り</small></div>
+  </div>
+  <div class="row"><small>返品元</small><span class="v v16">{{ s.customer }}</span></div>
+  <div class="row"><small>品番</small><span class="v v26">{{ s.part_no }}</span></div>
+  <div class="row tall"><small>商品名</small><span class="v v16 clamp2">{{ s.product_name }}</span></div>
+  <div class="row"><small>メーカー</small><span class="v v16">{{ s.maker }}</span></div>
+  <div class="row"><small>製造No.</small><span class="v v18">{{ s.serial_no }}</span></div>
+  <div class="row tall"><small>不良内容</small><span class="v v18 clamp2">{{ s.defect }}</span></div>
+  <div class="memo"><small>備考</small></div>
+</article>

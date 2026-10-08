@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>受付票の印刷</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/print.css">
+<style>
+@page { size: {{ '297mm 210mm' if layout == 'a4_2up' else '148mm 210mm' }}; margin: 0; }
+</style>
+</head>
+<body class="printpage">
+<div class="toolbar noprint">
+  <div class="row-actions">
+    <button class="btn primary" onclick="window.print()">印刷する</button>
+    <a class="btn" href="/print/batch.pdf?ids={{ ids }}&layout={{ layout }}" target="_blank">PDFで開く</a>
+    <a class="btn ghost" href="{{ back }}">戻る</a>
+  </div>
+  <p class="hint">
+    {% if layout == 'a4_2up' %}A4・横向き・倍率100%(実際のサイズ)で印刷すると、A5が2枚並びます。真ん中の線で切り離してください。
+    {% else %}A5・縦向き・倍率100%(実際のサイズ)で印刷してください。{% endif %}
+  </p>
+  <p class="hint">
+    印刷の形式:
+    <a href="?ids={{ ids }}&layout=a5">A5を1枚ずつ</a> /
+    <a href="?ids={{ ids }}&layout=a4_2up">A4に2枚並べる</a>
+    {% if pairs|length == 1 and request.url.path != '/print/batch' %}(1枚だけの場合は、片側が空白になります){% endif %}
+  </p>
+</div>
+
+<div class="sheets {{ layout }}">
+{% if layout == 'a4_2up' %}
+  {% for chunk in pairs | batch(2) %}
+  <section class="sheet two">
+    {% for r, s, qr in chunk %}{% include "_slip.html" %}{% endfor %}
+    <div class="cutline"><span>切り取り線</span></div>
+  </section>
+  {% endfor %}
+{% else %}
+  {% for r, s, qr in pairs %}
+  <section class="sheet one">{% include "_slip.html" %}</section>
+  {% endfor %}
+{% endif %}
+</div>
+
+<script>
+const ids = [{{ ids }}];
+window.addEventListener('afterprint', () => {
+  fetch('/api/printed', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ids})});
+});
+</script>
+</body>
+</html>

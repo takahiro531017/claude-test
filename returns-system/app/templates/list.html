@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}返品一覧{% endblock %}
+{% block content %}
+<h1>返品一覧 <small>{{ total }}件</small></h1>
+{% if err %}<p class="alert err">{{ err }}</p>{% endif %}
+<form class="filters" method="get" action="/returns">
+  <input name="q" value="{{ f.q }}" placeholder="受付番号・品番・商品名・製造No." autocomplete="off">
+  <select name="status">
+    <option value="">状況:すべて</option>
+    {% for s in STATUSES %}<option value="{{ s }}" {{ 'selected' if f.status == s }}>{{ STATUS_LABELS[s] }}</option>{% endfor %}
+  </select>
+  <select name="disposition">
+    <option value="">処分:すべて</option>
+    <option value="none" {{ 'selected' if f.disposition == 'none' }}>未決定</option>
+    {% for d in DISPOSITIONS %}<option value="{{ d }}" {{ 'selected' if f.disposition == d }}>{{ DISPOSITION_LABELS[d] }}</option>{% endfor %}
+  </select>
+  <input name="maker" value="{{ f.maker }}" placeholder="メーカー" autocomplete="off">
+  <input name="part_no" value="{{ f.part_no }}" placeholder="品番" autocomplete="off">
+  <input name="customer" value="{{ f.customer }}" placeholder="返品元" autocomplete="off">
+  <input name="date_from" type="date" value="{{ f.date_from }}" title="受付日(から)">
+  <input name="date_to" type="date" value="{{ f.date_to }}" title="受付日(まで)">
+  <label class="inline"><input type="checkbox" name="open_only" value="1" {{ 'checked' if f.open_only }}> 未完了のみ</label>
+  <button class="btn primary">絞り込む</button>
+  <a class="btn ghost" href="/returns">条件クリア</a>
+</form>
+
+<table class="list">
+  <thead><tr><th>受付番号</th><th>受付日</th><th>品番 / 商品名</th><th>メーカー</th><th>返品元</th><th>不良内容</th>
+    <th>数量</th><th>状況</th><th>処分</th><th>滞留</th></tr></thead>
+  <tbody>
+  {% for it in items %}{% set r = it.r %}
+  <tr class="lv-{{ it.level }}" onclick="location='/r/{{ r.receipt_no }}'">
+    <td data-l="受付番号"><a href="/r/{{ r.receipt_no }}">{{ r.receipt_no }}</a></td>
+    <td data-l="受付日">{{ r.received_on | ymd }}</td>
+    <td data-l="品番"><b>{{ r.part_no_text }}</b><br><small>{{ r.product_name }}</small></td>
+    <td data-l="メーカー">{{ r.maker_name or '' }}</td>
+    <td data-l="返品元">{{ r.customer_name or '' }}</td>
+    <td data-l="不良内容">{{ r.defect_name }}</td>
+    <td data-l="数量">{{ r.quantity }}</td>
+    <td data-l="状況"><span class="badge s-{{ r.status }}">{{ STATUS_LABELS[r.status] }}</span></td>
+    <td data-l="処分">{{ DISPOSITION_LABELS[r.disposition] if r.disposition else '' }}</td>
+    <td data-l="滞留">{% if r.status != 'done' %}{{ it.days }}日{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="10" class="hint">該当する返品はありません。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if pages > 1 %}
+<p class="pager">
+  {% if page > 1 %}<a class="btn small" href="/returns?{{ qs }}&page={{ page - 1 }}">← 前</a>{% endif %}
+  {{ page }} / {{ pages }}
+  {% if page < pages %}<a class="btn small" href="/returns?{{ qs }}&page={{ page + 1 }}">次 →</a>{% endif %}
+</p>
+{% endif %}
+{% endblock %}

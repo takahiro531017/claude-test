@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}登録しました{% endblock %}
+{% block content %}
+<div class="card center">
+  <p class="ok">登録しました</p>
+  <p class="bignum">{{ r.receipt_no }}</p>
+  <p>{{ r.part_no_text }}{% if r.product_name %} / {{ r.product_name }}{% endif %} × {{ r.quantity }}</p>
+  {% for w in warnings %}<p class="alert warn">{{ w }}</p>{% endfor %}
+  <a class="btn primary" href="/print/{{ r.receipt_no }}">受付票を印刷する</a>
+  <a class="btn" href="/new">続けて入力する</a>
+  <a class="btn ghost" href="/r/{{ r.receipt_no }}">詳細を見る</a>
+</div>
+{% endblock %}

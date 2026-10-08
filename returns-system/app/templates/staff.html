@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}担当者を選ぶ{% endblock %}
+{% block content %}
+<h1>担当者を選んでください</h1>
+<p class="hint">この端末に記憶されるので、次回からは選ぶ必要はありません。</p>
+<form method="post" action="/staff" class="card">
+  <input type="hidden" name="next" value="{{ next }}">
+  {% if staff_list %}
+  <div class="chips">
+    {% for s in staff_list %}
+    <button class="chip big" name="pick" value="{{ s.name }}">{{ s.name }}</button>
+    {% endfor %}
+  </div>
+  <p class="hint">名前がない場合は、下に入力してください。</p>
+  {% endif %}
+  <label>あなたの名前
+    <input name="name" autocomplete="off" placeholder="例:山田" {% if not staff_list %}autofocus{% endif %}>
+  </label>
+  <button class="btn primary">この名前で使う</button>
+</form>
+{% endblock %}

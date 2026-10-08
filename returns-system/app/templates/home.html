@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+{% if err %}<p class="alert err">{{ err }}</p>{% endif %}
+<div class="tiles">
+  <a class="tile primary" href="/new"><span class="ico">＋</span>返品を受け付ける</a>
+  <form class="tile find" action="/find" method="get">
+    <label>受付番号で探す(番号だけでもOK)
+      <input name="no" inputmode="text" autocapitalize="characters" autocomplete="off" placeholder="RT-20261008-001 または 5">
+    </label>
+    <button class="btn">開く</button>
+  </form>
+  <div class="tile qrhelp">QRコードは、スマホの<b>標準カメラ</b>を受付票にかざして読み取ってください。</div>
+</div>
+
+<h2>不良品置き場(未完了)</h2>
+<div class="stats">
+  {% for s in ['received','checking','decided'] %}
+  <a href="/returns?status={{ s }}"><b>{{ summary[s] }}</b><span>{{ STATUS_LABELS[s] }}</span></a>
+  {% endfor %}
+</div>
+{% if unprinted %}<p><a class="btn" href="/print-queue">未印刷の受付票が {{ unprinted }} 件あります →</a></p>{% endif %}
+
+<h2>今日の受付</h2>
+{% if todays[0] %}
+<ul class="cards">
+  {% for r in todays[0] %}
+  <li><a href="/r/{{ r.receipt_no }}"><b>{{ r.receipt_no }}</b> {{ r.part_no_text }}
+    <span class="badge s-{{ r.status }}">{{ STATUS_LABELS[r.status] }}</span></a></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="hint">今日の受付はまだありません。</p>{% endif %}
+<p><a href="/returns">返品一覧を見る</a></p>
+{% endblock %}

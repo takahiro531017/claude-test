@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}まとめて印刷{% endblock %}
+{% block content %}
+<h1>まとめて印刷 <small>{{ total }}件</small></h1>
+<p class="hint">印刷したい受付票にチェックを入れて、印刷方法を選んでください。印刷済みの受付票は「すべて表示」から再印刷できます。</p>
+<p>
+  <a class="btn small {{ '' if show == 'unprinted' else 'ghost' }}" href="/print-queue">未印刷のみ</a>
+  <a class="btn small {{ '' if show == 'all' else 'ghost' }}" href="/print-queue?show=all">すべて表示</a>
+</p>
+<form id="pq" method="get" action="/print/batch">
+  <input type="hidden" name="ids" id="ids">
+  <table class="list">
+    <thead><tr><th><input type="checkbox" id="all" aria-label="すべて選択"></th><th>受付番号</th><th>品番 / 商品名</th><th>返品元</th><th>数量</th><th>印刷</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><input type="checkbox" class="pick" value="{{ r.id }}" {{ 'checked' if r.print_status == 'unprinted' }}></td>
+      <td data-l="受付番号"><a href="/r/{{ r.receipt_no }}">{{ r.receipt_no }}</a></td>
+      <td data-l="品番"><b>{{ r.part_no_text }}</b><br><small>{{ r.product_name }}</small></td>
+      <td data-l="返品元">{{ r.customer_name or '' }}</td>
+      <td data-l="数量">{{ r.quantity }}</td>
+      <td data-l="印刷">{{ '印刷済み(' ~ r.print_count ~ '回)' if r.print_status == 'printed' else '未印刷' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="hint">未印刷の受付票はありません。</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="sticky-actions">
+    <button class="btn primary" name="layout" value="a4_2up">A4に2枚並べて印刷(切り取り用)</button>
+    <button class="btn" name="layout" value="a5">A5を1枚ずつ印刷</button>
+  </div>
+</form>
+{% endblock %}
+{% block script %}
+<script>
+const picks = () => [...document.querySelectorAll('.pick')];
+document.getElementById('all')?.addEventListener('change', e => picks().forEach(c => c.checked = e.target.checked));
+document.getElementById('pq').addEventListener('submit', e => {
+  const ids = picks().filter(c => c.checked).map(c => c.value);
+  if (!ids.length) { e.preventDefault(); alert('印刷する受付票を選んでください'); return; }
+  document.getElementById('ids').value = ids.join(',');
+});
+</script>
+{% endblock %}

@@ -1,0 +1,46 @@
+@font-face { font-family: "IPAexGothic"; src: url(/fonts/ipaexg.ttf) format("truetype"); }
+/* 受付票の印刷専用レイアウト(mm指定。A5縦=148x210mm) */
+body.printpage { background:#eee; font-size: 12pt; }
+.toolbar { max-width: 760px; margin: 0 auto; padding: 12px 14px; }
+.sheets { display:flex; flex-direction:column; align-items:center; gap: 14px; padding-bottom: 40px; }
+.sheet { background:#fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); position: relative; overflow:hidden; }
+.sheet.one { width:148mm; height:210mm; }
+.sheet.two { width:297mm; height:210mm; display:flex; padding-left:.5mm; }
+.sheet.two .slip { flex: 0 0 148mm; }
+.cutline { position:absolute; top:0; bottom:0; left:148.5mm; border-left: 0.4mm dashed #555; }
+.cutline span { position:absolute; top:50%; left:2mm; font-size: 7pt; color:#444; writing-mode: vertical-rl; transform: translateY(-50%); }
+@media screen and (max-width: 1100px) { .sheets { zoom: .5; } }
+@media screen and (max-width: 560px) { .sheets { zoom: .42; } }
+
+.slip { width:148mm; height:210mm; padding: 8mm; position: relative; color:#000; font-family: "IPAexGothic","IPAGothic","Hiragino Sans","Yu Gothic","Meiryo",sans-serif; }
+.slip header { display:flex; justify-content: space-between; align-items: baseline; border-bottom: .8pt solid #000; padding-bottom: 1.5mm; }
+.slip header .t { font-size: 15pt; } .slip header .d { font-size: 14pt; }
+.slip .head { display:flex; justify-content: space-between; height: 52mm; padding-top: 2mm; }
+.slip .no { flex:1; min-width:0; }
+.slip .no small, .slip .row small, .slip .memo small { display:block; font-size: 9pt; }
+.slip .no b { display:block; font-size: 31pt; line-height: 1.1; white-space: nowrap; letter-spacing: -.2pt; }
+.slip .qd { display:flex; gap: 12mm; margin-top: 3mm; }
+.slip .qd strong { font-size: 28pt; font-weight: normal; line-height: 1.1; display:block; }
+.slip .qd span { font-size: 18pt; display:block; padding-top: 3mm; }
+.slip .qr { width: 38mm; text-align:center; flex: none; }
+.slip .qrbox { width: 38mm; height: 38mm; }
+.slip .qrbox svg { width:100%; height:100%; display:block; }
+.slip .qr small { font-size: 8pt; display:block; margin-top: 1mm; }
+.slip .row { border-top: .4pt solid #000; padding-top: 1mm; height: 13mm; display:flex; flex-direction:column; overflow:hidden; position: relative; }
+.slip .row.tall { height: 20mm; }
+.slip .row:nth-of-type(3) { height: 17mm; }
+.slip .row small { position:absolute; left:0; top:1mm; }
+.slip .row .v { margin-left: 24mm; margin-top: 1mm; line-height: 1.25; word-break: break-all; overflow:hidden; }
+.slip .v16 { font-size: 16pt; } .slip .v18 { font-size: 18pt; } .slip .v26 { font-size: 26pt; line-height: 1.15; }
+.slip .clamp2 { display:-webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.slip .memo { border-top: .4pt solid #000; height: 30mm; padding-top: 1mm;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 7.6mm, #999 7.6mm, #999 8mm); background-position: 0 4mm; }
+
+@media print {
+  .noprint { display:none !important; }
+  body.printpage { background:#fff; margin:0; }
+  .sheets { zoom: 1 !important; display:block; padding:0; gap:0; }
+  .sheet { box-shadow:none; page-break-after: always; break-after: page; margin:0; }
+  .sheet:last-child { page-break-after: auto; break-after: auto; }
+  header.top { display:none; }
+}

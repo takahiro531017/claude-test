@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ r.receipt_no }}{% endblock %}
+{% block content %}
+{% if msg %}<p class="alert ok">{{ msg }}</p>{% endif %}
+{% if err %}<p class="alert err">{{ err }}</p>{% endif %}
+<div class="card">
+  <p class="bignum">{{ r.receipt_no }}</p>
+  <ol class="steps">
+    {% for s in STATUSES %}
+    <li class="{{ 'on' if STATUSES.index(s) <= STATUSES.index(r.status) else '' }}{{ ' now' if s == r.status else '' }}">{{ STATUS_LABELS[s] }}</li>
+    {% endfor %}
+  </ol>
+  {% if r.status != 'done' %}
+  <p class="stale {{ level }}">受付から {{ stale_days }} 日{% if level == 'over' %}(滞留しています){% endif %}</p>
+  {% endif %}
+  <p>処分方法:<b>{{ DISPOSITION_LABELS[r.disposition] if r.disposition else '未決定' }}</b></p>
+
+  <div class="actions">
+    {% if next_status %}
+    <form method="post" action="/r/{{ r.receipt_no }}/status">
+      <input type="hidden" name="status" value="{{ next_status }}">
+      <button class="btn primary">「{{ STATUS_LABELS[next_status] }}」にする</button>
+    </form>
+    {% endif %}
+    {% if r.status in ('checking', 'decided') %}
+    <form method="post" action="/r/{{ r.receipt_no }}/disposition" class="dispo">
+      <p class="hint">処分方法を選ぶ{% if r.disposition == 'recycle' %}(修理できなかった場合は「廃棄」に変更できます){% endif %}</p>
+      {% for d in DISPOSITIONS %}
+      <button class="btn {{ 'primary' if r.disposition == d else '' }}" name="disposition" value="{{ d }}">{{ DISPOSITION_LABELS[d] }}</button>
+      {% endfor %}
+    </form>
+    {% endif %}
+    {% if prev_status %}
+    <form method="post" action="/r/{{ r.receipt_no }}/status" onsubmit="return confirm('「{{ STATUS_LABELS[prev_status] }}」に戻しますか?')">
+      <input type="hidden" name="status" value="{{ prev_status }}">
+      <button class="btn ghost small">1つ前({{ STATUS_LABELS[prev_status] }})に戻す</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <dl class="info">
+    <dt>受付日</dt><dd>{{ r.received_on | ymd }}</dd>
+    <dt>返品元</dt><dd>{{ r.customer_name or '—' }}</dd>
+    <dt>品番</dt><dd class="strong">{{ r.part_no_text }}</dd>
+    <dt>商品名</dt><dd>{{ r.product_name or '—' }}</dd>
+    <dt>メーカー</dt><dd>{{ r.maker_name or '—' }}</dd>
+    <dt>製造番号</dt><dd>{{ r.serial_no or '—' }}</dd>
+    <dt>数量</dt><dd>{{ r.quantity }}</dd>
+    <dt>不良内容</dt><dd>{{ r.defect_name }}{% if r.defect_text %}<br>{{ r.defect_text }}{% endif %}</dd>
+    <dt>備考</dt><dd>{{ r.reason_note or '—' }}</dd>
+    <dt>担当者</dt><dd>{{ r.staff_name or '—' }}</dd>
+    <dt>受付票</dt><dd>{{ ('印刷済み(' ~ r.print_count ~ '回)') if r.print_status == 'printed' else '未印刷' }}</dd>
+  </dl>
+  {% if photos %}
+  <div class="thumbs">
+    {% for p in photos %}<a href="/photos/{{ p.file_path }}" target="_blank"><img src="/photos/{{ p.thumb_path }}" alt="写真"></a>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="row-actions">
+    <a class="btn" href="/print/{{ r.receipt_no }}">{{ '再印刷' if r.print_status == 'printed' else '受付票を印刷' }}</a>
+    <a class="btn" href="/r/{{ r.receipt_no }}/edit">内容を修正・追記</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>履歴</h2>
+  <ul class="timeline">
+    {% for e in events %}
+    <li><time>{{ e.at | ymdhm }}</time> <b>{{ e.actor }}</b>
+      {% if e.action == 'status' %}状況を「{{ e.from_value }}」→「{{ e.to_value }}」{% elif e.action == 'disposition' %}処分方法を{{ '「' ~ e.from_value ~ '」→' if e.from_value }}「{{ e.to_value }}」{% elif e.action == 'create' %}受付登録{% elif e.action == 'print' %}受付票を印刷{% else %}内容を修正{% endif %}
+      {% if e.note and e.action in ('edit',) %}<br><small>{{ e.note }}</small>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

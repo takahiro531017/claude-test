@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ '返品の受付' if mode == 'new' else '受付内容の修正' }}{% endblock %}
+{% block content %}
+<h1>{{ '返品を受け付ける' if mode == 'new' else '受付内容を修正する(' ~ ret.receipt_no ~ ')' }}</h1>
+<form id="rform" class="stack" autocomplete="off"
+      data-mode="{{ mode }}" data-action="{{ '/api/returns' if mode == 'new' else '/api/returns/' ~ ret.id ~ '/update' }}"
+      {% if mode == 'edit' %}data-receipt="{{ ret.receipt_no }}"{% endif %}>
+  <p id="formerr" class="alert err" hidden></p>
+  {% if mode == 'new' %}
+  <div class="row-actions">
+    <button type="button" class="btn small" id="carry">前回の内容を引き継ぐ</button>
+    <button type="button" class="btn small ghost" id="clear">入力をクリア</button>
+  </div>
+  <p id="draftnote" class="hint" hidden>入力途中の内容を復元しました。</p>
+  {% endif %}
+
+  <label>返品元(取引先)
+    <span class="ac"><input name="customer" data-ac="customer" value="{{ ret.customer_name or '' if ret else '' }}" placeholder="例:ダミー商事"></span>
+  </label>
+  <label>品番 <em class="req">必須</em>
+    <span class="ac"><input name="part_no" data-ac="product" required autocapitalize="characters" inputmode="text"
+      spellcheck="false" value="{{ ret.part_no_text if ret else '' }}" placeholder="例:ABC-1234"></span>
+  </label>
+  <label>商品名
+    <span class="ac"><input name="product_name" value="{{ ret.product_name if ret else '' }}" placeholder="品番を選ぶと自動で入ります"></span>
+  </label>
+  <p id="namewarn" class="alert warn" hidden></p>
+  <label>メーカー名
+    <span class="ac"><input name="maker" data-ac="maker" value="{{ ret.maker_name or '' if ret else '' }}" placeholder="わからなければ空欄でOK"></span>
+  </label>
+  <label>製造番号(製造No.)
+    <input name="serial_no" inputmode="text" autocapitalize="characters" spellcheck="false"
+      value="{{ ret.serial_no if ret else '' }}" placeholder="不明なら空欄">
+  </label>
+  <label>数量 <em class="req">必須</em>
+    <span class="qty">
+      <button type="button" class="btn" data-qty="-1" aria-label="減らす">−</button>
+      <input name="quantity" type="number" inputmode="numeric" pattern="[0-9]*" min="1" value="{{ ret.quantity if ret else 1 }}" required>
+      <button type="button" class="btn" data-qty="1" aria-label="増やす">＋</button>
+    </span>
+  </label>
+
+  <fieldset>
+    <legend>不良内容 <em class="req">必須</em></legend>
+    <div class="chips" id="defectchips">
+      {% for d in defects %}
+      <button type="button" class="chip" data-defect="{{ d.name }}">{{ d.name }}</button>
+      {% endfor %}
+    </div>
+    <label>その他(ここに入力すると、次回から選択肢に追加されます)
+      <input name="defect" id="defect" value="{{ ret.defect_name or '' if ret else '' }}" placeholder="選択肢にない場合は入力">
+    </label>
+  </fieldset>
+
+  <details {% if mode == 'edit' %}open{% endif %}>
+    <summary>くわしく入力する(備考・写真・受付日)</summary>
+    <label>不良の詳細(自由記述)
+      <textarea name="defect_text" rows="2">{{ ret.defect_text if ret else '' }}</textarea>
+    </label>
+    <label>返品理由・備考
+      <textarea name="reason_note" rows="2">{{ ret.reason_note if ret else '' }}</textarea>
+    </label>
+    <label>写真(撮影またはアップロード。何枚でも可)
+      <input type="file" id="photos" accept="image/*" multiple>
+    </label>
+    <div id="thumbs" class="thumbs"></div>
+    <label>受付日
+      <input name="received_on" type="date" value="{{ ret.received_on if ret else today }}">
+    </label>
+  </details>
+
+  <div class="sticky-actions">
+    {% if mode == 'new' %}
+    <button type="submit" class="btn primary" data-next="0">保存する</button>
+    <button type="submit" class="btn" data-next="1">保存して次を入力</button>
+    {% else %}
+    <button type="submit" class="btn primary" data-next="0">修正を保存</button>
+    <a class="btn ghost" href="/r/{{ ret.receipt_no }}">キャンセル</a>
+    {% endif %}
+  </div>
+</form>
+<div id="toast" class="toast" hidden></div>
+{% endblock %}
+{% block script %}<script src="/static/form.js"></script>{% endblock %}
