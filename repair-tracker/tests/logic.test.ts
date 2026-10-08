@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { MAIN_FLOW, allowedTransitions, nextStatus, prevStatus, staleReason } from '../src/lib/status'
 import { sanitizeSearch, searchFilter } from '../src/lib/search'
