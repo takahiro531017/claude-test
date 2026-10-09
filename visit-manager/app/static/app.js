@@ -198,7 +198,7 @@ async function vHome(el) {
     <div class="list">${over.items.length ? over.items.map(storeItem).join("") : `<div class="empty">該当する店舗はありません 👍</div>`}</div>
     ${over.items.length ? `<p><a href="#/stores">店舗一覧で見る →</a></p>` : ""}
     <h2>最近の訪問(全員)</h2>
-    <div class="list">${vis.items.length ? vis.items.map((v) => `<a class="item" href="#/store/${encodeURIComponent(v.store_code)}"><div><div class="t">${esc(v.display_name)}</div><div class="muted small">${esc(v.company)} ・ ${esc(v.rep_name || "")}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div><div class="r">${fmtDate(v.visit_date)}</div></a>`).join("") : `<div class="empty">まだ訪問の記録がありません</div>`}</div>`;
+    <div class="list">${vis.items.length ? vis.items.map((v) => `<a class="item" href="#/store/${encodeURIComponent(v.store_code)}"><div><div class="t">${esc(v.display_name)}${v.manual ? ' <span class="badge b-amber">リスト外</span>' : ""}</div><div class="muted small">${esc(v.company)} ・ ${esc(v.rep_name || "")}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div><div class="r">${fmtDate(v.visit_date)}</div></a>`).join("") : `<div class="empty">まだ訪問の記録がありません</div>`}</div>`;
   async function loadReps() {
     const box = $("#reptbl"); const ym = HOME_MONTH === "this" ? thisYm : addMonths(thisYm, -1);
     $("#hm0").classList.toggle("on", HOME_MONTH === "this"); $("#hm1").classList.toggle("on", HOME_MONTH === "prev");
@@ -233,11 +233,23 @@ async function vVisit(el, q) {
   function renderStore() {
     const box = $("#sbox");
     if (store) {
-      box.innerHTML = `<div class="sel"><div><div class="t">${esc(store.display_name)}</div><div class="muted small">${esc(store.company)} ・ ${esc(store.code)}</div></div><button type="button" class="btn sm" id="chg">変更</button></div>`;
+      box.innerHTML = `<div class="sel"><div><div class="t">${esc(store.display_name)}</div><div class="muted small">${esc(store.company)} ・ ${store.manual || store.listOut ? '<span class="badge b-amber">リスト外</span>' : esc(store.code)}</div></div><button type="button" class="btn sm" id="chg">変更</button></div>`;
       $("#chg").onclick = () => { store = null; renderStore(); };
     } else {
       box.innerHTML = `<input id="cq" type="search" list="colist" placeholder="① 法人名で絞り込み(例: ヤマダ)" autocomplete="off" aria-label="法人名で絞り込み" value="${esc(cq)}"><datalist id="colist">${S.meta.companies.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>
-        <input id="sq" type="search" inputmode="search" placeholder="② 店舗名・コードで検索" autocomplete="off" aria-label="店舗名またはコードで検索" style="margin-top:8px" value="${esc(sq)}"><div class="pick list" id="pick"></div>`;
+        <input id="sq" type="search" inputmode="search" placeholder="② 店舗名・コードで検索" autocomplete="off" aria-label="店舗名またはコードで検索" style="margin-top:8px" value="${esc(sq)}"><button type="button" class="btn" id="manualBtn" style="width:100%;margin-top:8px;min-height:40px">＋ リストにない訪問先を手入力する</button>
+        <div id="manualForm" class="card" style="margin-top:8px;background:var(--pri-l)" hidden>
+          <p class="small" style="margin:0 0 6px"><b>リスト外の訪問先</b>を記録します。担当店舗の数・訪問率には含まれませんが、訪問回数・法人数には数えます。</p>
+          <label class="f" for="mc">法人名(任意)</label><input id="mc" maxlength="60" placeholder="例: ○○商事" value="${esc(cq)}">
+          <label class="f" for="mn">訪問先名(必須)</label><input id="mn" maxlength="60" placeholder="例: ○○商事 △△店" value="${esc(sq)}">
+          <div class="row" style="margin-top:10px"><button type="button" class="btn pri grow" id="manualOk">この訪問先にする</button><button type="button" class="btn" id="manualCancel">やめる</button></div></div><div class="pick list" id="pick" style="margin-top:8px"></div>`;
+      $("#manualBtn").onclick = () => { $("#manualForm").hidden = false; $("#manualBtn").hidden = true; $("#mc").value = cq; $("#mn").value = sq; $("#mn").focus(); };
+      $("#manualCancel").onclick = () => { $("#manualForm").hidden = true; $("#manualBtn").hidden = false; };
+      $("#manualOk").onclick = () => {
+        const mn = $("#mn").value.trim(), mc = $("#mc").value.trim();
+        if (!mn) { $("#mn").focus(); return toast("訪問先名を入力してください"); }
+        store = { manual: true, code: "", company: mc || "(リスト外)", display_name: mn, manual_company: mc, manual_name: mn }; renderStore();
+      };
       const run = async () => {
         const my = ++seq; const pick = $("#pick"); pick.innerHTML = `<div class="empty"><span class="spin"></span></div>`;
         try {
@@ -258,12 +270,12 @@ async function vVisit(el, q) {
     const box = $("#recent");
     try {
       const d = await api("/api/visits" + qs({ limit: 10, rep: isAdmin ? "" : me.rep_code }));
-      box.innerHTML = d.items.length ? `<div class="list">${d.items.map((v) => `<div class="item"><div><div class="t">${esc(v.display_name)}</div>
+      box.innerHTML = d.items.length ? `<div class="list">${d.items.map((v) => `<div class="item"><div><div class="t">${esc(v.display_name)}${v.manual ? ' <span class="badge b-amber">リスト外</span>' : ""}</div>
         <div class="muted small">${fmtDate(v.visit_date)} ・ ${esc(v.rep_name || "")}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div>
         ${v.editable ? `<div class="row"><button class="btn sm" data-e="${v.id}">編集</button><button class="btn sm danger" data-x="${v.id}">削除</button></div>` : ""}</div>`).join("")}</div>` : `<div class="empty">まだ訪問の記録がありません</div>`;
       $$("[data-e]", box).forEach((b) => (b.onclick = () => {
         editing = d.items.find((v) => v.id == b.dataset.e);
-        store = { code: editing.store_code, display_name: editing.display_name, company: editing.company };
+        store = { code: editing.store_code, display_name: editing.display_name, company: editing.company, listOut: !!editing.manual };
         $d.value = editing.visit_date; $r.value = editing.rep_code; $m.value = editing.memo;
         $("#ttl").textContent = "訪問を編集"; $("#go").textContent = "更新する"; $("#cancel").hidden = false; renderStore(); window.scrollTo(0, 0);
       }));
@@ -280,7 +292,8 @@ async function vVisit(el, q) {
   $("#f").onsubmit = async (ev) => {
     ev.preventDefault(); const msg = $("#msg"); msg.innerHTML = "";
     if (!store) { msg.innerHTML = `<div class="alert err">店舗を選んでください</div>`; return; }
-    const body = { visit_date: $d.value, store_code: store.code, rep_code: $r.value, memo: $m.value, force: false };
+    const body = { visit_date: $d.value, store_code: store.manual ? "" : store.code, rep_code: $r.value, memo: $m.value, force: false };
+    if (store.manual) { body.manual_company = store.manual_company; body.manual_name = store.manual_name; }
     const btn = $("#go"); btn.disabled = true;
     try {
       for (;;) {

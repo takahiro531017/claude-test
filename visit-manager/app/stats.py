@@ -31,10 +31,10 @@ def summarize(conn, start: date, end: date, rep: str | None = None) -> dict:
         f"FROM visits v JOIN stores s ON s.code=v.store_code WHERE {where}", p).fetchone()
     sp = [rep] if rep else []
     sw = "AND rep_code=?" if rep else ""
-    assigned = conn.execute(f"SELECT COUNT(*) c FROM stores WHERE active=1 {sw}", sp).fetchone()["c"]
+    assigned = conn.execute(f"SELECT COUNT(*) c FROM stores WHERE active=1 AND manual=0 {sw}", sp).fetchone()["c"]
     vis_in = conn.execute(
         f"SELECT COUNT(DISTINCT v.store_code) c FROM visits v JOIN stores s ON s.code=v.store_code "
-        f"WHERE {where} AND s.active=1 {'AND s.rep_code=?' if rep else ''}", p + sp).fetchone()["c"]
+        f"WHERE {where} AND s.active=1 AND s.manual=0 {'AND s.rep_code=?' if rep else ''}", p + sp).fetchone()["c"]
     return {"visits": row["visits"], "stores": row["stores"], "companies": row["companies"],
             "assigned_stores": assigned, "visited_assigned": vis_in,
             "rate": round(vis_in / assigned, 4) if assigned else 0.0}
@@ -50,7 +50,7 @@ def company_breakdown(conn, start: date, end: date, rep: str | None = None) -> l
         f"FROM visits v JOIN stores s ON s.code=v.store_code WHERE {where} GROUP BY s.company", p)}
     sw, sp = ("AND rep_code=?", [rep]) if rep else ("", [])
     totals = {r["company"]: r["c"] for r in conn.execute(
-        f"SELECT company, COUNT(*) c FROM stores WHERE active=1 {sw} GROUP BY company", sp)}
+        f"SELECT company, COUNT(*) c FROM stores WHERE active=1 AND manual=0 {sw} GROUP BY company", sp)}
     out = []
     for c in set(rows) | set(totals):
         r = rows.get(c, {"visited_stores": 0, "visits": 0})
@@ -101,7 +101,7 @@ def store_list(conn, today: date, q: str = "", rep: str | None = None, company: 
         "SELECT s.code, s.company, s.name, s.rep_code, r.name rep_name, "
         "MAX(v.visit_date) last_visit, COUNT(v.id) visit_count "
         "FROM stores s LEFT JOIN sales_reps r ON r.code=s.rep_code "
-        "LEFT JOIN visits v ON v.store_code=s.code WHERE s.active=1 GROUP BY s.code").fetchall()
+        "LEFT JOIN visits v ON v.store_code=s.code WHERE s.active=1 AND s.manual=0 GROUP BY s.code").fetchall()
     fq = _fold(q).strip()
     fcq = _fold(company_q).strip()
     out = []
@@ -145,7 +145,7 @@ def rep_stores(conn, start: date, end: date, rep: str, today: date) -> dict:
         "(SELECT COUNT(*) FROM visits v WHERE v.store_code=s.code AND v.visit_date BETWEEN ? AND ?) visits_all, "
         "(SELECT COUNT(*) FROM visits v WHERE v.store_code=s.code AND v.visit_date BETWEEN ? AND ? AND v.rep_code=?) visits_rep, "
         "(SELECT MAX(v.visit_date) FROM visits v WHERE v.store_code=s.code) last_visit "
-        "FROM stores s WHERE s.active=1 AND s.rep_code=? ORDER BY s.company, s.name, s.code",
+        "FROM stores s WHERE s.active=1 AND s.manual=0 AND s.rep_code=? ORDER BY s.company, s.name, s.code",
         (a, b, a, b, rep, rep)).fetchall()
     items = []
     for r in rows:

@@ -123,3 +123,24 @@ def test_security_headers(env):
     r = c.get("/")
     assert "default-src 'self'" in r.headers["content-security-policy"]
     assert c.get("/api/meta").headers["cache-control"] == "no-store"
+
+
+def test_manual_visit_for_store_not_in_list(env):
+    c = ready(env)
+    today = c.get("/api/meta").json()["today"]
+    r = c.post("/api/visits", json={"visit_date": today, "manual_company": "架空リスト外商事", "manual_name": "新規店"})
+    assert r.status_code == 201
+    r = c.post("/api/visits", json={"visit_date": today, "manual_company": "架空リスト外商事", "manual_name": "新規店"})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "duplicate"      # 同じ訪問先は同じ扱い
+    assert c.post("/api/visits", json={"visit_date": today}).status_code == 400    # 店舗も手入力もない
+    items = c.get("/api/visits").json()["items"]
+    assert items[0]["manual"] == 1 and items[0]["display_name"] == "新規店"
+    m = c.get(f"/api/stats/monthly?month={today[:7]}").json()
+    assert m["summary"]["visits"] == 1 and m["summary"]["assigned_stores"] == 6      # 担当店舗数は増えない
+    assert all(s["code"] != items[0]["store_code"] for s in c.get("/api/stores").json()["items"])
+    assert "架空リスト外商事" not in c.get("/api/meta").json()["companies"]
+    # マスタ再取り込みでも、手入力の訪問先と訪問は消えない
+    conn = db.connect()
+    importer.import_master(conn, env[2] / "m.xlsx", "m.xlsx", "t"); conn.close()
+    assert len(c.get("/api/visits").json()["items"]) == 1
+    assert c.get(f"/api/stores/{items[0]['store_code']}").status_code == 200

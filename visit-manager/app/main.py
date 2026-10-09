@@ -173,7 +173,7 @@ def change_password(body: PwIn, response: Response, u=Depends(_user), conn=Depen
 def meta(u=Depends(user_ok), conn=Depends(get_conn)):
     reps = [dict(r) for r in conn.execute("SELECT code, name FROM sales_reps WHERE active=1 ORDER BY code")]
     companies = [r["company"] for r in conn.execute(
-        "SELECT DISTINCT company FROM stores WHERE active=1 ORDER BY company")]
+        "SELECT DISTINCT company FROM stores WHERE active=1 AND manual=0 ORDER BY company")]
     return {"user": public_user(u, conn), "reps": reps, "companies": companies,
             "today": config.today_jst().isoformat(),
             "threshold_days": int(db.get_setting(conn, "threshold_days", str(config.DEFAULT_THRESHOLD_DAYS)))}
@@ -219,10 +219,26 @@ def store_detail(code: str, u=Depends(user_ok), conn=Depends(get_conn)):
 # ---------- 訪問 ----------
 class VisitIn(BaseModel):
     visit_date: str
-    store_code: str
+    store_code: str = ""
+    manual_company: str = Field(default="", max_length=60)   # リスト外の訪問先を手入力するとき
+    manual_name: str = Field(default="", max_length=60)
     rep_code: str | None = None
     memo: str = Field(default="", max_length=1000)
     force: bool = False
+
+
+def _manual_store(conn, rep: str, company: str, name: str) -> str:
+    """リスト外の訪問先。同じ法人名+訪問先名があれば再利用し、なければ M0001 形式のコードで作る。"""
+    company, name = (company.strip() or "(リスト外)"), name.strip()
+    row = conn.execute("SELECT code FROM stores WHERE manual=1 AND company=? AND name=?", (company, name)).fetchone()
+    if row:
+        return row["code"]
+    n = conn.execute("SELECT COUNT(*) c FROM stores WHERE manual=1").fetchone()["c"] + 1
+    while conn.execute("SELECT 1 FROM stores WHERE code=?", (f"M{n:04d}",)).fetchone():
+        n += 1
+    code = f"M{n:04d}"
+    conn.execute("INSERT INTO stores(code,company,name,rep_code,active,manual) VALUES(?,?,?,?,1,1)", (code, company, name, rep))
+    return code
 
 
 def _can_edit(u, v) -> bool:
@@ -231,13 +247,15 @@ def _can_edit(u, v) -> bool:
 
 def _check_visit(conn, u, body: VisitIn, exclude_id: int | None = None) -> tuple[str, str]:
     d = parse_date(body.visit_date, "訪問日")
-    if not conn.execute("SELECT 1 FROM stores WHERE code=?", (body.store_code,)).fetchone():
-        raise HTTPException(400, "店舗が見つかりません")
     rep = body.rep_code or u["rep_code"]
     if not rep or not conn.execute("SELECT 1 FROM sales_reps WHERE code=?", (rep,)).fetchone():
         raise HTTPException(400, "営業担当者を選んでください")
     if u["role"] != "admin" and rep != u["rep_code"]:
         raise HTTPException(403, "自分の訪問のみ登録できます")
+    if body.manual_name.strip():
+        body.store_code = _manual_store(conn, rep, body.manual_company, body.manual_name)
+    if not conn.execute("SELECT 1 FROM stores WHERE code=?", (body.store_code,)).fetchone():
+        raise HTTPException(400, "店舗を選ぶか、訪問先名を入力してください")
     if not body.force:
         if d > config.today_jst():
             raise HTTPException(409, detail={"code": "future", "message": "未来の日付です。このまま登録しますか?"})
@@ -297,7 +315,7 @@ def list_visits(rep: str | None = None, start: str | None = None, end: str | Non
         w.append("v.visit_date>=?"); p.append(parse_date(start).isoformat())
     if end:
         w.append("v.visit_date<=?"); p.append(parse_date(end).isoformat())
-    sql = ("SELECT v.id, v.visit_date, v.store_code, s.company, s.name store_name, v.rep_code, r.name rep_name, v.memo "
+    sql = ("SELECT v.id, v.visit_date, v.store_code, s.company, s.name store_name, s.manual, v.rep_code, r.name rep_name, v.memo "
            "FROM visits v JOIN stores s ON s.code=v.store_code LEFT JOIN sales_reps r ON r.code=v.rep_code "
            + ("WHERE " + " AND ".join(w) if w else "") + " ORDER BY v.visit_date DESC, v.id DESC LIMIT ?")
     items = [dict(r) for r in conn.execute(sql, p + [min(max(limit, 1), 500)])]

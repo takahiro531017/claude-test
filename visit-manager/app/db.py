@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS stores (
   company TEXT NOT NULL,                 -- 得意先名(法人)
   name TEXT NOT NULL DEFAULT '',         -- 店舗名(空欄可)
   rep_code TEXT NOT NULL REFERENCES sales_reps(code),
-  active INTEGER NOT NULL DEFAULT 1      -- マスタから消えたら 0(履歴は残す)
+  active INTEGER NOT NULL DEFAULT 1,     -- マスタから消えたら 0(履歴は残す)
+  manual INTEGER NOT NULL DEFAULT 0      -- 1 = 訪問入力で手入力された「リスト外」の訪問先(担当店舗の集計には含めない)
 );
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -65,6 +66,9 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(stores)")]
+    if "manual" not in cols:   # 既存のDBを引き継ぐための移行(データは消えません)
+        conn.execute("ALTER TABLE stores ADD COLUMN manual INTEGER NOT NULL DEFAULT 0")
     conn.commit()
 
 

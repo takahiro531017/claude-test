@@ -128,7 +128,7 @@ def import_master(conn, source, filename: str, imported_by: str) -> dict:
                                  (s["company"], s["name"], s["rep_code"], code))
                     report["updated_stores"] += 1
         for code, ex in existing.items():
-            if code not in seen and ex["active"]:
+            if code not in seen and ex["active"] and not ex["manual"]:
                 conn.execute("UPDATE stores SET active=0 WHERE code=?", (code,))
                 report["deactivated_stores"] += 1
         safe = {k: v for k, v in report.items() if k != "new_users"}
@@ -151,7 +151,7 @@ def company_key(name: str) -> str:
 
 def name_candidates(conn) -> list[dict]:
     counts: Counter = Counter()
-    for r in conn.execute("SELECT company FROM stores WHERE active=1"):
+    for r in conn.execute("SELECT company FROM stores WHERE active=1 AND manual=0"):
         counts[r["company"]] += 1
     names = list(counts)
     keys = {n: company_key(n) for n in names}
