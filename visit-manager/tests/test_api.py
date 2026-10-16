@@ -154,3 +154,24 @@ def test_daily_api(env):
     me = [r for r in d["reps"] if r["rep_code"] == "R1"][0]
     assert me["counts"][:3] == [2, 1, 0] and me["total"] == 3
     assert c.get("/api/stats/daily?start=2026-01-01&end=2026-12-31").status_code == 400
+
+
+def test_get_edit_delete_visit_from_anywhere(env):
+    c1 = ready(env, "R1")
+    vid = c1.post("/api/visits", json={"visit_date": "2026-10-01", "store_code": "10001", "memo": "元"}).json()["id"]
+    v = c1.get(f"/api/visits/{vid}").json()
+    assert v["editable"] is True and v["memo"] == "元" and v["store_code"] == "10001"
+    # 店舗の履歴・営業の画面にも、編集できるかどうかの印が出る
+    assert c1.get("/api/stores/10001").json()["visits"][0]["editable"] is True
+    assert c1.get("/api/stats/rep/R1?month=2026-10").json()["editable"] is True
+    assert c1.get("/api/stats/rep/R2?month=2026-10").json()["editable"] is False
+    # 日付・店舗・メモを変更できる
+    assert c1.put(f"/api/visits/{vid}", json={"visit_date": "2026-10-02", "store_code": "10002", "memo": "新"}).status_code == 200
+    v = c1.get(f"/api/visits/{vid}").json()
+    assert (v["visit_date"], v["store_code"], v["memo"]) == ("2026-10-02", "10002", "新")
+    c1.post("/api/auth/logout")
+    c2 = ready(env, "R2")
+    assert c2.get(f"/api/visits/{vid}").json()["editable"] is False                       # 他の人は見るだけ
+    assert c2.put(f"/api/visits/{vid}", json={"visit_date": "2026-10-03", "store_code": "10002"}).status_code == 403
+    assert c2.get("/api/visits/99999").status_code == 404
+    c2.post("/api/auth/logout")

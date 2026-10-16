@@ -224,8 +224,9 @@ async function vVisit(el, q) {
     <label class="f" for="r">営業担当者</label><select id="r" ${isAdmin ? "" : "disabled"}>${S.meta.reps.map((r) => `<option value="${esc(r.code)}">${esc(r.name)}(${esc(r.code)})</option>`).join("")}</select>
     <label class="f">店舗</label><div id="sbox"></div>
     <label class="f" for="m">メモ(任意)</label><textarea id="m" maxlength="1000" placeholder="例: 新商品の案内"></textarea>
-    <div id="msg"></div><div class="row" style="margin-top:14px"><button class="btn pri block grow" id="go" type="submit">登録する</button><button class="btn" type="button" id="cancel" hidden>編集をやめる</button></div></form>
-    <h2>${isAdmin ? "最近の訪問(全員)" : "最近の自分の訪問"}</h2><div id="recent">${loading()}</div>`;
+    <div id="msg"></div><div class="row" style="margin-top:14px"><button class="btn pri block grow" id="go" type="submit">登録する</button><button class="btn" type="button" id="cancel" hidden>編集をやめる</button></div>
+    <div style="margin-top:10px"><button class="btn danger" type="button" id="delEdit" hidden>この訪問を削除する</button></div></form>
+    <h2>${isAdmin ? "最近の訪問(全員・直近30件)" : "最近の自分の訪問(直近30件)"}</h2><div id="recent">${loading()}</div>`;
   const $d = $("#d"), $r = $("#r"), $m = $("#m");
   $d.value = S.meta.today;
   if (me.rep_code) $r.value = me.rep_code; else if (S.meta.reps[0]) $r.value = S.meta.reps[0].code;
@@ -269,26 +270,32 @@ async function vVisit(el, q) {
   async function loadRecent() {
     const box = $("#recent");
     try {
-      const d = await api("/api/visits" + qs({ limit: 10, rep: isAdmin ? "" : me.rep_code }));
+      const d = await api("/api/visits" + qs({ limit: 30, rep: isAdmin ? "" : me.rep_code }));
       box.innerHTML = d.items.length ? `<div class="list">${d.items.map((v) => `<div class="item"><div><div class="t">${esc(v.display_name)}${v.manual ? ' <span class="badge b-amber">リスト外</span>' : ""}</div>
         <div class="muted small">${fmtDate(v.visit_date)} ・ ${esc(v.rep_name || "")}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div>
         ${v.editable ? `<div class="row"><button class="btn sm" data-e="${v.id}">編集</button><button class="btn sm danger" data-x="${v.id}">削除</button></div>` : ""}</div>`).join("")}</div>` : `<div class="empty">まだ訪問の記録がありません</div>`;
-      $$("[data-e]", box).forEach((b) => (b.onclick = () => {
-        editing = d.items.find((v) => v.id == b.dataset.e);
-        store = { code: editing.store_code, display_name: editing.display_name, company: editing.company, listOut: !!editing.manual };
-        $d.value = editing.visit_date; $r.value = editing.rep_code; $m.value = editing.memo;
-        $("#ttl").textContent = "訪問を編集"; $("#go").textContent = "更新する"; $("#cancel").hidden = false; renderStore(); window.scrollTo(0, 0);
-      }));
+      $$("[data-e]", box).forEach((b) => (b.onclick = () => startEdit(d.items.find((v) => v.id == b.dataset.e))));
       $$("[data-x]", box).forEach((b) => (b.onclick = async () => {
         if (!(await confirmBox("この訪問を削除しますか?(元に戻せません)", "削除する", true))) return;
         try { await api("/api/visits/" + b.dataset.x, { method: "DELETE" }); toast("削除しました"); if (editing && editing.id == b.dataset.x) reset(); loadRecent(); } catch (e) { if (!e.handled) toast(e.message); }
       }));
     } catch (e) { fail(box, e, loadRecent); }
   }
-  function reset() {
-    editing = null; store = null; $m.value = ""; $("#ttl").textContent = "訪問を入力"; $("#go").textContent = "登録する"; $("#cancel").hidden = true; renderStore();
+  function startEdit(v) {
+    editing = v; store = { code: v.store_code, display_name: v.display_name, company: v.company, listOut: !!v.manual };
+    $d.value = v.visit_date; if ([...$r.options].some((o) => o.value === v.rep_code)) $r.value = v.rep_code; $m.value = v.memo || "";
+    $("#ttl").textContent = "訪問を編集"; $("#go").textContent = "更新する"; $("#cancel").hidden = false; $("#delEdit").hidden = false; $("#msg").innerHTML = "";
+    renderStore(); window.scrollTo(0, 0);
   }
-  $("#cancel").onclick = reset;
+  function reset() {
+    editing = null; store = null; $m.value = ""; $("#ttl").textContent = "訪問を入力"; $("#go").textContent = "登録する"; $("#cancel").hidden = true; $("#delEdit").hidden = true; renderStore();
+  }
+  const leave = () => { if (q.edit) { if (history.length > 1) history.back(); else location.hash = "#/"; return true; } return false; };   // 他の画面から来たときは、元の画面へ戻る
+  $("#cancel").onclick = () => { reset(); leave(); };
+  $("#delEdit").onclick = async () => {
+    if (!editing || !(await confirmBox("この訪問を削除しますか?(元に戻せません)", "削除する", true))) return;
+    try { await api("/api/visits/" + editing.id, { method: "DELETE" }); toast("削除しました"); reset(); if (!leave()) loadRecent(); } catch (e) { if (!e.handled) $("#msg").innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  };
   $("#f").onsubmit = async (ev) => {
     ev.preventDefault(); const msg = $("#msg"); msg.innerHTML = "";
     if (!store) { msg.innerHTML = `<div class="alert err">店舗を選んでください</div>`; return; }
@@ -306,11 +313,15 @@ async function vVisit(el, q) {
           throw e;
         }
       }
-      toast(editing ? "更新しました" : "登録しました ✔"); reset(); loadRecent();
+      const wasEdit = !!editing; toast(wasEdit ? "更新しました" : "登録しました ✔"); reset(); if (!(wasEdit && leave())) loadRecent();
     } catch (e) { if (!e.handled) msg.innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
     btn.disabled = false;
   };
   loadRecent();
+  if (q.edit) {   // 他の画面の「編集」ボタンから来たとき
+    try { const v = await api("/api/visits/" + encodeURIComponent(q.edit)); if (!v.editable) throw new Error("この訪問は、本人または管理者だけが編集できます"); startEdit(v); }
+    catch (e) { if (!e.handled) $("#msg").innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
 }
 
 // ---------- 店舗一覧 ----------
@@ -347,7 +358,7 @@ async function vStoreDetail(el, code) {
     <div class="card"><div class="muted small">${esc(s.company)} ・ 得意先コード ${esc(s.code)} ・ 担当 ${esc(s.rep_name || "")}</div>
     <div style="margin:8px 0">最終訪問日: <b>${s.last_visit ? fmtDate(s.last_visit) : "未訪問"}</b> ${elapsedBadge(s)}</div>
     <a class="btn pri" href="#/visit?store=${encodeURIComponent(s.code)}">＋ この店舗の訪問を入力</a></div>
-    <h2>訪問履歴(${d.visits.length}件)</h2>${d.visits.length ? `<div class="card scroll"><table><thead><tr><th>日付</th><th>営業</th><th>メモ</th></tr></thead><tbody>${d.visits.map((v) => `<tr><td>${fmtDate(v.visit_date)}</td><td>${esc(v.rep_name || v.rep_code)}</td><td>${esc(v.memo)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">まだ訪問の記録がありません</div>`}`;
+    <h2>訪問履歴(${d.visits.length}件)</h2>${d.visits.length ? `<div class="card scroll"><table><thead><tr><th>日付</th><th>営業</th><th>メモ</th><th></th></tr></thead><tbody>${d.visits.map((v) => `<tr><td>${fmtDate(v.visit_date)}</td><td>${esc(v.rep_name || v.rep_code)}</td><td>${esc(v.memo)}</td><td>${v.editable ? `<a class="btn sm" href="#/visit?edit=${v.id}">編集</a>` : ""}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">まだ訪問の記録がありません</div>`}`;
 }
 
 // ---------- 集計 ----------
@@ -511,7 +522,7 @@ async function vRepStores(el, code, q) {
   const counts = days.map((x) => (byDay[x] || []).length), visitDays = Object.keys(byDay).sort().reverse();
   const dayList = visitDays.length ? visitDays.map((x) => { const w = dayInfo(x); const vs = byDay[x];
     return `<div class="card" style="padding:10px 12px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><b>${fmtDate(x)}<span class="${wdCls(w.w)}">(${WD[w.w]})</span></b><span class="badge b-green">${vs.length}件</span></div>
-      ${vs.map((v) => `<div class="vrow"><a href="#/store/${encodeURIComponent(v.store_code)}">${esc(v.store_name || v.company)}</a>${v.manual ? ' <span class="badge b-amber">リスト外</span>' : ""}<div class="muted small">${esc(v.company)}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div>`).join("")}</div>`; }).join("")
+      ${vs.map((v) => `<div class="vrow"><a href="#/store/${encodeURIComponent(v.store_code)}">${esc(v.store_name || v.company)}</a>${v.manual ? ' <span class="badge b-amber">リスト外</span>' : ""}<div class="muted small">${esc(v.company)}${v.memo ? " ・ " + esc(v.memo) : ""}</div>${vd.editable ? `<a class="btn sm" style="margin-top:4px" href="#/visit?edit=${v.id}">編集・削除</a>` : ""}</div>`).join("")}</div>`; }).join("")
     : `<div class="empty">この期間の訪問はありません</div>`;
   el.innerHTML = `<p><a href="#/reps${qs(per)}">← 営業の一覧</a></p><h1>${esc(d.rep.name)}</h1>${periodBar(per, "/rep/" + encodeURIComponent(code))}
     <p class="muted small">${perLabel(per)}</p>

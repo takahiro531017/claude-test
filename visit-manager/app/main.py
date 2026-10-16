@@ -211,6 +211,8 @@ def store_detail(code: str, u=Depends(user_ok), conn=Depends(get_conn)):
         "LEFT JOIN sales_reps r ON r.code=v.rep_code WHERE v.store_code=? ORDER BY v.visit_date DESC, v.id DESC", (code,))]
     d = dict(s)
     d["display_name"] = d["name"] or d["company"]
+    for v in visits:
+        v["editable"] = u["role"] == "admin" or u["rep_code"] == v["rep_code"]
     d["last_visit"] = visits[0]["visit_date"] if visits else None
     d["days"] = (config.today_jst() - date.fromisoformat(d["last_visit"])).days if d["last_visit"] else None
     return {"store": d, "visits": visits}
@@ -275,6 +277,18 @@ def create_visit(body: VisitIn, u=Depends(user_ok), conn=Depends(get_conn)):
                        "VALUES(?,?,?,?,?,?,?)", (d, body.store_code, rep, body.memo.strip(), u["id"], now, now))
     conn.commit()
     return {"id": cur.lastrowid}
+
+
+@app.get("/api/visits/{vid}")
+def get_visit(vid: int, u=Depends(user_ok), conn=Depends(get_conn)):
+    v = conn.execute("SELECT v.id, v.visit_date, v.store_code, s.company, s.name store_name, s.manual, v.rep_code, r.name rep_name, v.memo "
+                     "FROM visits v JOIN stores s ON s.code=v.store_code LEFT JOIN sales_reps r ON r.code=v.rep_code WHERE v.id=?", (vid,)).fetchone()
+    if not v:
+        raise HTTPException(404, "訪問が見つかりません(削除された可能性があります)")
+    d = dict(v)
+    d["display_name"] = d["store_name"] or d["company"]
+    d["editable"] = u["role"] == "admin" or u["rep_code"] == d["rep_code"]
+    return d
 
 
 @app.put("/api/visits/{vid}")
@@ -383,7 +397,9 @@ def stats_daily(month: str | None = None, start: str | None = None, end: str | N
 def stats_rep(rep: str, month: str | None = None, start: str | None = None, end: str | None = None,
               u=Depends(user_ok), conn=Depends(get_conn)):
     s, e = _period(month, start, end)
-    return stats.rep_detail(conn, s, e, rep)
+    d = stats.rep_detail(conn, s, e, rep)
+    d["editable"] = u["role"] == "admin" or u["rep_code"] == rep
+    return d
 
 
 @app.get("/api/reps/{rep}/stores")
