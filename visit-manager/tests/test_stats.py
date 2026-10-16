@@ -123,3 +123,21 @@ def test_rep_stores_counts(conn, master):
     assert (by["10001"]["visits_all"], by["10001"]["visits_rep"]) == (2, 1)
     assert by["10003"]["visits_all"] == 0 and by["10003"]["last_visit"] == "2026-09-20" and by["10003"]["days"] == 17
     assert d["summary"] == {"assigned_stores": 3, "visited_stores": 2, "unvisited_stores": 1, "visits_all": 3, "visits_rep": 2}
+
+
+def test_daily_counts(conn, master):
+    setup(conn, master)
+    add(conn, "2026-10-01", "10001", "R1")
+    add(conn, "2026-10-01", "10002", "R1")
+    add(conn, "2026-10-03", "10001", "R1")
+    add(conn, "2026-10-03", "10004", "R2")
+    add(conn, "2026-11-01", "10001", "R1")                 # 期間外
+    d = stats.daily_counts(conn, *stats.month_range("2026-10"))
+    assert len(d["days"]) == 31 and d["days"][0] == "2026-10-01" and d["days"][-1] == "2026-10-31"
+    r = {x["rep_code"]: x for x in d["reps"]}
+    assert r["R1"]["counts"][0] == 2 and r["R1"]["counts"][2] == 1 and r["R1"]["total"] == 3
+    assert r["R2"]["counts"][2] == 1 and r["R2"]["total"] == 1
+    assert d["totals"][0] == 2 and d["totals"][2] == 2 and sum(d["totals"]) == 4
+    # 営業別の合計と同じ数字になる(画面間で食い違わない)
+    by = {x["rep_code"]: x["visits"] for x in stats.by_rep(conn, *stats.month_range("2026-10"))["reps"]}
+    assert all(by[k] == v["total"] for k, v in r.items())

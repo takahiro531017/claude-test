@@ -470,23 +470,61 @@ function bindPeriod(per, base, extra = {}) {
 }
 const perLabel = (per) => (per.start ? `${fmtDate(per.start)} 〜 ${fmtDate(per.end)}` : fmtMonth(per.month));
 
-async function vReps(el, q) {
-  const per = periodQuery(q); const d = await api("/api/stats/by-rep" + qs(per));
-  el.innerHTML = `<h1>営業</h1>${periodBar(per, "/reps")}<p class="muted small">${perLabel(per)} ・ 営業を押すと、その人の担当店舗ごとの訪問件数が見られます。</p>
-    <div class="list">${d.reps.map((r) => `<a class="item" href="#/rep/${encodeURIComponent(r.rep_code)}${qs(per)}"><div style="min-width:0"><div class="t">${esc(r.rep_name)}${r.rep_code === S.me.rep_code ? ' <span class="badge b-green" style="white-space:nowrap">あなた</span>' : ""}</div>
-      <div class="muted small">担当 ${r.assigned_stores}店舗 ・ 訪問した店舗 ${r.stores} ・ 訪問率 ${pct(r.rate)}</div></div><div class="r"><div class="t" style="font-size:1.3rem">${r.visits}</div><div class="muted small">訪問回数</div></div></a>`).join("") || `<div class="empty">営業が登録されていません</div>`}</div>`;
-  bindPeriod(per, "/reps");
+const WD = "日月火水木金土";
+const dayInfo = (iso) => { const d = new Date(iso + "T00:00:00"); return { n: d.getDate(), w: d.getDay() }; };
+const wdCls = (w) => (w === 0 ? "sun" : w === 6 ? "sat" : "");
+function dayMatrix(d, per) {
+  const heads = d.days.map((x) => { const i = dayInfo(x); return `<th class="${wdCls(i.w)}" title="${fmtDate(x)}(${WD[i.w]})">${i.n}<div>${WD[i.w]}</div></th>`; }).join("");
+  const cell = (c, x) => `<td class="${wdCls(dayInfo(x).w)} ${c >= 3 ? "c3" : c === 2 ? "c2" : c === 1 ? "c1" : ""}">${c || ""}</td>`;
+  const rows = d.reps.map((r) => `<tr><th class="rn"><a href="#/rep/${encodeURIComponent(r.rep_code)}${qs(per)}">${esc(r.rep_name)}</a></th>${r.counts.map((c, i) => cell(c, d.days[i])).join("")}<td class="tot">${r.total}</td></tr>`).join("");
+  const tot = `<tr class="mx-tot"><th class="rn">全体</th>${d.totals.map((c) => `<td>${c || ""}</td>`).join("")}<td class="tot">${d.totals.reduce((a, b) => a + b, 0)}</td></tr>`;
+  return `<div class="card scroll mx"><table><thead><tr><th class="rn">営業</th>${heads}<th class="tot">計</th></tr></thead><tbody>${rows}${tot}</tbody></table></div>`;
+}
+function dayBars(days, counts) {
+  const W = 640, H = 110, L = 22, B = 18, T = 6, n = days.length, gw = (W - L - 4) / n, max = Math.max(1, ...counts), ph = H - B - T;
+  let g = ""; [0, Math.ceil(max / 2), max].forEach((v, i, arr) => { if (i && v === arr[i - 1]) return; const y = T + ph - (ph * v) / max; g += `<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="currentColor" opacity=".12"/><text x="${L - 4}" y="${y + 3}" text-anchor="end">${v}</text>`; });
+  const bars = counts.map((c, i) => { const h = (ph * c) / max, x = L + i * gw + gw * 0.15; const w = dayInfo(days[i]); return `<rect x="${x.toFixed(1)}" y="${(T + ph - h).toFixed(1)}" width="${(gw * 0.7).toFixed(1)}" height="${Math.max(h, 0).toFixed(1)}" fill="#2563eb" rx="1"><title>${fmtDate(days[i])}(${WD[w.w]}) ${c}件</title></rect>`
+    + (n <= 31 || i % 5 === 0 || i === n - 1 ? `<text x="${(x + gw * 0.35).toFixed(1)}" y="${H - 4}" text-anchor="middle">${w.n}</text>` : ""); }).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="日別の訪問件数のグラフ">${g}${bars}</svg>`;
 }
 
-const RS = { sort: "visits_asc", only: "" };
+async function vReps(el, q) {
+  const per = periodQuery(q); const d = await api("/api/stats/by-rep" + qs(per));
+  el.innerHTML = `<h1>営業</h1>${periodBar(per, "/reps")}<p class="muted small">${perLabel(per)} ・ 営業を押すと、その人の日別の訪問先と、担当店舗ごとの訪問件数が見られます。</p>
+    <div class="list">${d.reps.map((r) => `<a class="item" href="#/rep/${encodeURIComponent(r.rep_code)}${qs(per)}"><div style="min-width:0"><div class="t">${esc(r.rep_name)}${r.rep_code === S.me.rep_code ? ' <span class="badge b-green" style="white-space:nowrap">あなた</span>' : ""}</div>
+      <div class="muted small">担当 ${r.assigned_stores}店舗 ・ 訪問した店舗 ${r.stores} ・ 訪問率 ${pct(r.rate)}</div></div><div class="r"><div class="t" style="font-size:1.3rem">${r.visits}</div><div class="muted small">訪問回数</div></div></a>`).join("") || `<div class="empty">営業が登録されていません</div>`}</div>
+    <h2>日別の訪問件数(営業 × 日)</h2><div id="mxbox">${loading()}</div>`;
+  bindPeriod(per, "/reps");
+  const box = $("#mxbox");
+  try { box.innerHTML = dayMatrix(await api("/api/stats/daily" + qs(per)), per) + `<p class="muted small">数字は、その日の訪問件数(延べ)です。営業名を押すと、訪問先が見られます。</p>`; }
+  catch (e) { if (!e.handled) box.innerHTML = `<div class="alert warn">${esc(e.message)}</div>`; }
+}
+
+const RS = { sort: "visits_asc", only: "", tab: "days" };
 async function vRepStores(el, code, q) {
-  const per = periodQuery(q); const d = await api(`/api/reps/${encodeURIComponent(code)}/stores` + qs(per)); const sm = d.summary;
-  el.innerHTML = `<p><a href="#/reps${qs(per)}">← 営業の一覧</a></p><h1>${esc(d.rep.name)} の担当店舗</h1>${periodBar(per, "/rep/" + encodeURIComponent(code))}
+  const per = periodQuery(q);
+  const [d, vd] = await Promise.all([api(`/api/reps/${encodeURIComponent(code)}/stores` + qs(per)), api(`/api/stats/rep/${encodeURIComponent(code)}` + qs(per))]);
+  const sm = d.summary;
+  // 日別
+  const days = []; for (let t = new Date(d.start + "T00:00:00"), e = new Date(d.end + "T00:00:00"); t <= e; t.setDate(t.getDate() + 1)) days.push(`${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`);
+  const byDay = {}; vd.visits.forEach((v) => (byDay[v.visit_date] = byDay[v.visit_date] || []).push(v));
+  const counts = days.map((x) => (byDay[x] || []).length), visitDays = Object.keys(byDay).sort().reverse();
+  const dayList = visitDays.length ? visitDays.map((x) => { const w = dayInfo(x); const vs = byDay[x];
+    return `<div class="card" style="padding:10px 12px"><div class="row" style="justify-content:space-between;margin-bottom:4px"><b>${fmtDate(x)}<span class="${wdCls(w.w)}">(${WD[w.w]})</span></b><span class="badge b-green">${vs.length}件</span></div>
+      ${vs.map((v) => `<div class="vrow"><a href="#/store/${encodeURIComponent(v.store_code)}">${esc(v.store_name || v.company)}</a>${v.manual ? ' <span class="badge b-amber">リスト外</span>' : ""}<div class="muted small">${esc(v.company)}${v.memo ? " ・ " + esc(v.memo) : ""}</div></div>`).join("")}</div>`; }).join("")
+    : `<div class="empty">この期間の訪問はありません</div>`;
+  el.innerHTML = `<p><a href="#/reps${qs(per)}">← 営業の一覧</a></p><h1>${esc(d.rep.name)}</h1>${periodBar(per, "/rep/" + encodeURIComponent(code))}
     <p class="muted small">${perLabel(per)}</p>
-    <div class="kpis">${kpi(sm.assigned_stores, "担当店舗数")}${kpi(sm.visited_stores, "訪問のあった店舗")}${kpi(sm.unvisited_stores, "訪問のない店舗")}${kpi(sm.visits_all, `訪問回数(本人 ${sm.visits_rep})`)}</div>
-    <div class="row" style="margin:14px 0 8px"><select id="rso" class="grow"><option value="visits_asc">訪問が少ない順</option><option value="visits_desc">訪問が多い順</option><option value="days">最終訪問が古い順</option><option value="company">得意先名順</option></select>
-      <select id="rsf" class="grow"><option value="">すべて</option><option value="none">訪問のない店舗のみ</option></select></div><div id="rsl"></div>
-    <p class="muted small">訪問回数 = その店舗への全員の訪問(期間内)。「本人」は、この営業自身の訪問です。</p>`;
+    <div class="kpis">${kpi(vd.summary.visits, "訪問回数")}${kpi(visitDays.length, "訪問した日数")}${kpi(vd.summary.stores, "訪問した店舗数")}${kpi(sm.assigned_stores, `担当店舗数(訪問なし ${sm.unvisited_stores})`)}</div>
+    <div class="seg" style="margin:14px 0 10px"><button id="tDays" class="${RS.tab === "days" ? "on" : ""}">日別の訪問先</button><button id="tStores" class="${RS.tab === "stores" ? "on" : ""}">担当店舗ごとの件数</button></div>
+    <div id="paneDays" ${RS.tab === "days" ? "" : "hidden"}><div class="card">${dayBars(days, counts)}</div><div class="list" style="gap:8px">${dayList}</div></div>
+    <div id="paneStores" ${RS.tab === "stores" ? "" : "hidden"}>
+      <div class="kpis" style="margin-bottom:10px">${kpi(sm.visited_stores, "訪問のあった担当店舗")}${kpi(sm.unvisited_stores, "訪問のない担当店舗")}${kpi(sm.visits_all, `担当店舗への訪問(本人 ${sm.visits_rep})`)}</div>
+      <div class="row" style="margin:0 0 8px"><select id="rso" class="grow"><option value="visits_asc">訪問が少ない順</option><option value="visits_desc">訪問が多い順</option><option value="days">最終訪問が古い順</option><option value="company">得意先名順</option></select>
+        <select id="rsf" class="grow"><option value="">すべて</option><option value="none">訪問のない店舗のみ</option></select></div><div id="rsl"></div>
+      <p class="muted small">訪問回数 = その店舗への全員の訪問(期間内)。「本人」は、この営業自身の訪問です。</p></div>`;
+  const tab = (t) => { RS.tab = t; $("#paneDays").hidden = t !== "days"; $("#paneStores").hidden = t !== "stores"; $("#tDays").classList.toggle("on", t === "days"); $("#tStores").classList.toggle("on", t === "stores"); };
+  $("#tDays").onclick = () => tab("days"); $("#tStores").onclick = () => tab("stores");
   $("#rso").value = RS.sort; $("#rsf").value = RS.only;
   const draw = () => {
     RS.sort = $("#rso").value; RS.only = $("#rsf").value;

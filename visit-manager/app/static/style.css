@@ -122,3 +122,15 @@ pre.cred{background:var(--gray-l);padding:10px;border-radius:8px;overflow:auto}
  .paper{box-shadow:none;width:auto;min-height:0;margin:0;padding:4mm 5mm}
  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* 営業×日の表 */
+.mx table{border-collapse:separate;border-spacing:0;font-size:.78rem}
+.mx th,.mx td{padding:3px 4px;text-align:center;border-bottom:1px solid var(--line);min-width:22px;font-variant-numeric:tabular-nums}
+.mx thead th{font-size:.72rem;line-height:1.15;color:var(--sub)}.mx thead th div{font-size:.62rem}
+.mx th.rn{position:sticky;left:0;background:var(--card);text-align:left;white-space:nowrap;min-width:84px;z-index:1;padding-right:8px;border-right:1px solid var(--line)}
+.mx td.tot,.mx th.tot{font-weight:700;border-left:1px solid var(--line);min-width:30px}
+.mx td.c1{background:var(--pri-l)}.mx td.c2{background:color-mix(in srgb,var(--pri) 30%,var(--card));font-weight:700}.mx td.c3{background:color-mix(in srgb,var(--pri) 55%,var(--card));font-weight:700;color:#fff}
+.mx .sun{color:var(--red)}.mx .sat{color:var(--pri)}.mx td.c3.sun,.mx td.c3.sat{color:#fff}
+.mx-tot th,.mx-tot td{font-weight:700;background:var(--gray-l)}
+.sun{color:var(--red)}.sat{color:var(--pri)}
+.vrow{padding:6px 0;border-top:1px solid var(--line)}.vrow:first-of-type{border-top:0}.vrow a{font-weight:700}

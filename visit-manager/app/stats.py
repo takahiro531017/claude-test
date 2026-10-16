@@ -81,7 +81,7 @@ def by_rep(conn, start: date, end: date) -> dict:
 
 def rep_detail(conn, start: date, end: date, rep: str) -> dict:
     visits = [dict(r) for r in conn.execute(
-        "SELECT v.id, v.visit_date, v.store_code, s.company, s.name store_name, v.memo "
+        "SELECT v.id, v.visit_date, v.store_code, s.company, s.name store_name, s.manual, v.memo "
         "FROM visits v JOIN stores s ON s.code=v.store_code "
         "WHERE v.rep_code=? AND v.visit_date BETWEEN ? AND ? ORDER BY v.visit_date DESC, v.id DESC",
         (rep, start.isoformat(), end.isoformat()))]
@@ -157,3 +157,21 @@ def rep_stores(conn, start: date, end: date, rep: str, today: date) -> dict:
         "assigned_stores": len(items), "visited_stores": sum(1 for i in items if i["visits_all"] > 0),
         "unvisited_stores": sum(1 for i in items if i["visits_all"] == 0),
         "visits_all": sum(i["visits_all"] for i in items), "visits_rep": sum(i["visits_rep"] for i in items)}}
+
+
+def daily_counts(conn, start: date, end: date) -> dict:
+    """営業ごと・日ごとの訪問件数(延べ)。days は期間内の全日付、reps[].counts は days と同じ並び。"""
+    days, d = [], start
+    while d <= end:
+        days.append(d.isoformat())
+        d += timedelta(days=1)
+    idx = {x: i for i, x in enumerate(days)}
+    per = {}
+    for r in conn.execute("SELECT rep_code, visit_date, COUNT(*) c FROM visits WHERE visit_date BETWEEN ? AND ? "
+                          "GROUP BY rep_code, visit_date", (start.isoformat(), end.isoformat())):
+        per.setdefault(r["rep_code"], [0] * len(days))[idx[r["visit_date"]]] = r["c"]
+    reps = []
+    for r in conn.execute("SELECT code, name FROM sales_reps WHERE active=1 ORDER BY code"):
+        counts = per.get(r["code"], [0] * len(days))
+        reps.append({"rep_code": r["code"], "rep_name": r["name"], "counts": counts, "total": sum(counts)})
+    return {"days": days, "reps": reps, "totals": [sum(x["counts"][i] for x in reps) for i in range(len(days))]}

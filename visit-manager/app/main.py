@@ -370,6 +370,15 @@ def _csv_safe(v: str) -> str:
     return "'" + v if v[:1] in "=+-@" else v  # CSVインジェクション対策
 
 
+@app.get("/api/stats/daily")
+def stats_daily(month: str | None = None, start: str | None = None, end: str | None = None,
+                u=Depends(user_ok), conn=Depends(get_conn)):
+    s, e = _period(month, start, end)
+    if (e - s).days > 92:
+        raise HTTPException(400, "日別の表は、最大で約3か月の期間までです")
+    return stats.daily_counts(conn, s, e)
+
+
 @app.get("/api/stats/rep/{rep}")
 def stats_rep(rep: str, month: str | None = None, start: str | None = None, end: str | None = None,
               u=Depends(user_ok), conn=Depends(get_conn)):

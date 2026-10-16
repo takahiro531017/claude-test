@@ -144,3 +144,13 @@ def test_manual_visit_for_store_not_in_list(env):
     importer.import_master(conn, env[2] / "m.xlsx", "m.xlsx", "t"); conn.close()
     assert len(c.get("/api/visits").json()["items"]) == 1
     assert c.get(f"/api/stores/{items[0]['store_code']}").status_code == 200
+
+
+def test_daily_api(env):
+    c = ready(env)
+    for dd in ("2026-10-01", "2026-10-01", "2026-10-02"):
+        c.post("/api/visits", json={"visit_date": dd, "store_code": "10001", "force": True})
+    d = c.get("/api/stats/daily?month=2026-10").json()
+    me = [r for r in d["reps"] if r["rep_code"] == "R1"][0]
+    assert me["counts"][:3] == [2, 1, 0] and me["total"] == 3
+    assert c.get("/api/stats/daily?start=2026-01-01&end=2026-12-31").status_code == 400
