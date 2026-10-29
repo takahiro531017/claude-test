@@ -752,6 +752,12 @@
 
   function $(sel, root){ return (root||document).querySelector(sel); }
   function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+  function bindFilterInput(el, onChange){
+    var composing = false;
+    el.addEventListener("compositionstart", function(){ composing = true; });
+    el.addEventListener("compositionend", function(){ composing = false; onChange(el.value); });
+    el.addEventListener("input", function(){ if(!composing) onChange(el.value); });
+  }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
   function fmtYen(n){ n = Number(n)||0; return "¥" + Math.round(n).toLocaleString("ja-JP"); }
   function fmtDate(iso){ if(!iso) return "-"; var p = iso.split("-"); return p.length===3 ? (p[0]+"/"+p[1]+"/"+p[2]) : iso; }
@@ -1518,7 +1524,7 @@
       b.addEventListener("click", function(){ switchView(b.dataset.view); });
     });
 
-    $("#searchInput").addEventListener("input", function(e){ state.searchText = e.target.value; renderRepairs(); });
+    bindFilterInput($("#searchInput"), function(v){ state.searchText = v; renderRepairs(); });
     $("#statusFilter").addEventListener("click", function(e){
       var c = e.target.closest(".chip");
       if(!c) return;
@@ -1561,7 +1567,7 @@
       if(tr) openRepairSheet(tr.dataset.id);
     });
 
-    $("#destSearchInput").addEventListener("input", function(e){ state.destSearchText = e.target.value; renderDestinations(); });
+    bindFilterInput($("#destSearchInput"), function(v){ state.destSearchText = v; renderDestinations(); });
     $("#btnNewDest").addEventListener("click", function(){ openDestinationSheet(null); });
     $("#btnCloseDestSheet").addEventListener("click", closeDestinationSheet);
     $("#btnCancelDest").addEventListener("click", closeDestinationSheet);
@@ -1581,7 +1587,7 @@
       }
     });
 
-    $("#ksSearchInput").addEventListener("input", function(e){ state.ksSearchText = e.target.value; renderKsFees(); });
+    bindFilterInput($("#ksSearchInput"), function(v){ state.ksSearchText = v; renderKsFees(); });
     $("#btnNewKs").addEventListener("click", function(){ openKsSheet(null); });
     $("#btnCloseKsSheet").addEventListener("click", closeKsSheet);
     $("#btnCancelKs").addEventListener("click", closeKsSheet);
